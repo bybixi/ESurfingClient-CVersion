@@ -15,6 +15,7 @@ define Package/luci-app-esurfingclient
 	SECTION:=luci
 	CATEGORY:=LuCI
 	TITLE:=LuCI interface for ESurfingClient
+	VERSION:=$(PKG_VERSION)
 	DEPENDS:=+esurfingclient
 	PKGARCH:=all
 endef
