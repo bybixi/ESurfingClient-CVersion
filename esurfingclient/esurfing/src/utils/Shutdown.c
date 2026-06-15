@@ -39,8 +39,12 @@ void shut(const uint8_t exit_code)
         int result_code = 0;
         g_prog_status[i].runtime_status.is_running = false;
         sim_thread_join(g_prog_status[i].thread, &result_code);
+        free(g_prog_status[i].thread);
+        g_prog_status[i].thread = NULL;
         LOG_DEBUG("认证线程退出, 退出码: %d", result_code);
     }
+    free(g_prog_status);
+    g_prog_status = NULL;
     LOG_INFO("退出程序, 退出码: %" PRIu8, exit_code);
     clean_logger();
 

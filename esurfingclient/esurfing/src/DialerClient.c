@@ -57,6 +57,12 @@ static bool term()
     while (result.status != REQUEST_SUCCESS && result.status != REQUEST_HAVE_RES)
     {
         if (result.body_data) { free(result.body_data); result.body_data = NULL; }
+        if (!g_thread_keep_alive || g_prog_status[tl_thread_idx].runtime_status.is_running == false)
+        {
+            LOG_WARN("收到退出信号, 中止登出重试");
+            free(encrypt);
+            return false;
+        }
         if (retry > 5)
         {
             LOG_FATAL("超过最多重试次数, 返回");
@@ -504,9 +510,9 @@ static void reset()
 
 static RunStatus run()
 {
-    static uint8_t retry_timeout = 1;
-    static uint8_t retry_auth = 1;
-    static uint64_t retry_auth_time = 0;
+    static _Thread_local uint8_t retry_timeout = 1;
+    static _Thread_local uint8_t retry_auth = 1;
+    static _Thread_local uint64_t retry_auth_time = 0;
 
     switch (check_network_status()) // 检测网络状态
     {
@@ -758,8 +764,9 @@ void work()
                     {
                         if (retry > 5)
                         {
-                            LOG_FATAL("超过重试次数, 强制退出线程");
-                            sim_thread_destroy(g_prog_status[j].thread);
+                            LOG_WARN("配置 %" PRIu8 " 登出等待超时, 强制标记退出", g_prog_status[j].login_cfg.idx);
+                            g_prog_status[j].runtime_status.is_running = false;
+                            break;
                         }
                         LOG_DEBUG("等待配置 %" PRIu8 " 登出, 下标 %" PRIu8 ", 等待次数: %" PRIu8 ", 最多 5 次", g_prog_status[j].login_cfg.idx, j, retry);
                         retry++;

@@ -11,12 +11,15 @@ on:
       version:
         required: true
         type: string
+        default: "2.0.4"
       release:
         required: true
         type: string
+        default: "6"
       sdk_version:
         required: true
         type: string
+        default: "24.10.6"
 
 env:
   SDK_URL: "https://downloads.openwrt.org/releases/25.12.0/targets/qualcommax/ipq60xx"
@@ -116,9 +119,9 @@ jobs:
           
           cd openwrt-sdk
           
-          scripts/feeds install esurfingclient
-          
-          make package/esurfingclient/compile -j$(nproc)
+          make defconfig
+
+          make package/esurfingclient/compile -j$(nproc) V=s
 
           find bin/packages -name "esurfingclient*.apk" -exec cp {} ../esurfingclient_${{ inputs.version }}-${{ inputs.release }}_qualcommax_ipq60xx.apk \;
 

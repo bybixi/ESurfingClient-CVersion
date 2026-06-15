@@ -583,6 +583,12 @@ NetworkStatus get_last_location()
 
     while (resp.status == REQUEST_REDIRECT)
     {
+        if (!g_thread_keep_alive || g_prog_status[tl_thread_idx].runtime_status.is_running == false)
+        {
+            LOG_WARN("收到退出信号, 中止重定向循环");
+            if (resp.body_data) free(resp.body_data);
+            return REQUEST_ERROR;
+        }
         if (resp.body_data) { free(resp.body_data); resp.body_data = NULL; resp.body_size = 0; }
         resp = get(g_prog_status[tl_thread_idx].last_location);
     }
