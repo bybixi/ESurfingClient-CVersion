@@ -42,6 +42,7 @@ define Package/esurfingclient
 	SECTION:=net
 	CATEGORY:=Network
 	TITLE:=ESurfingClient
+	VERSION:=$(PKG_VERSION)
 	PKGARCH:=all
 endef
 
