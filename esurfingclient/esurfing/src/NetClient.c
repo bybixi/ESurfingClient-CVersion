@@ -49,16 +49,33 @@ char* extract_url_param(const char* url, const char* search_str_start)
         LOG_ERROR("URL 为空");
         return NULL;
     }
-    const size_t len = strlen(search_str_start);
-    char* search_pattern = malloc(len + 2);
+    const size_t key_len = strlen(search_str_start);
+    char* search_pattern = malloc(key_len + 2);
     if (search_pattern == NULL)
     {
         LOG_ERROR("分配内存失败");
         return NULL;
     }
-    snprintf(search_pattern, len + 2, "%s=", search_str_start);
-    char* result = extract_between_tags(url, search_pattern, "&");
+    snprintf(search_pattern, key_len + 2, "%s=", search_str_start);
+
+    const char* start = strstr(url, search_pattern);
     free(search_pattern);
+    if (start == NULL)
+    {
+        LOG_ERROR("未找到 URL 参数: %s", search_str_start);
+        return NULL;
+    }
+    start += key_len + 1;
+
+    const size_t value_len = strcspn(start, "&#");
+    char* result = malloc(value_len + 1);
+    if (result == NULL)
+    {
+        LOG_ERROR("分配内存失败");
+        return NULL;
+    }
+    memcpy(result, start, value_len);
+    result[value_len] = '\0';
     return result;
 }
 
@@ -532,8 +549,36 @@ NetworkStatus check_network_status()
 
 static void get_school_ip_symbol()
 {
-    const char* school_ip = extract_url_param(g_prog_status[0].last_location, "wlanuserip");
-    snprintf(g_school_network_symbol, SCHOOL_NETWORK_SYMBOL, "%s", safe_str(extract_between_tags(school_ip, "", strchr(strchr(school_ip, '.') + 1, '.'))));
+    if (tl_thread_idx < 0)
+    {
+        LOG_WARN("未在线程上下文中获取校园网标志");
+        snprintf(g_school_network_symbol, SCHOOL_NETWORK_SYMBOL, "%s", "");
+        return;
+    }
+
+    char* school_ip = extract_url_param(g_prog_status[tl_thread_idx].last_location, "wlanuserip");
+    if (school_ip == NULL)
+    {
+        LOG_WARN("未获取到 wlanuserip, 使用空校园网标志");
+        snprintf(g_school_network_symbol, SCHOOL_NETWORK_SYMBOL, "%s", "");
+        return;
+    }
+
+    char* first_dot = strchr(school_ip, '.');
+    char* second_dot = first_dot ? strchr(first_dot + 1, '.') : NULL;
+    if (second_dot == NULL)
+    {
+        LOG_WARN("wlanuserip 格式异常: %s", school_ip);
+        snprintf(g_school_network_symbol, SCHOOL_NETWORK_SYMBOL, "%s", "");
+        free(school_ip);
+        return;
+    }
+
+    const size_t symbol_len = second_dot - school_ip;
+    const size_t copy_len = symbol_len >= SCHOOL_NETWORK_SYMBOL ? SCHOOL_NETWORK_SYMBOL - 1 : symbol_len;
+    memcpy(g_school_network_symbol, school_ip, copy_len);
+    g_school_network_symbol[copy_len] = '\0';
+    free(school_ip);
     LOG_INFO("获取到校园网标志: %s", g_school_network_symbol);
 }
 

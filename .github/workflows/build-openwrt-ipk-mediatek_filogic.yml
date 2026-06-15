@@ -6,6 +6,22 @@ permissions:
 
 on:
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Package version'
+        required: true
+        type: string
+        default: "2.0.4"
+      release:
+        description: 'Package release'
+        required: true
+        type: string
+        default: "6"
+      sdk_version:
+        description: 'OpenWrt SDK version'
+        required: true
+        type: string
+        default: "24.10.6"
   workflow_call:
     inputs:
       version:
@@ -34,39 +50,39 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: 更新 Makefile 版本号
+      - name: Update Makefile version
         run: |
-          sed -i "s/PKG_VERSION:=.*/PKG_VERSION:=${{ inputs.version }}/" esurfingclient/Makefile
-          sed -i "s/PKG_RELEASE:=.*/PKG_RELEASE:=${{ inputs.release }}/" esurfingclient/Makefile
+          sed -i "s/PKG_VERSION:=.*/PKG_VERSION:=${{ inputs.version || '2.0.4' }}/" esurfingclient/Makefile
+          sed -i "s/PKG_RELEASE:=.*/PKG_RELEASE:=${{ inputs.release || '6' }}/" esurfingclient/Makefile
 
-      - name: 安装软件包 (最多重试 3 次)
+      - name: Install build dependencies
         run: |
           PACKAGES="build-essential clang flex bison g++ gawk gcc-multilib g++-multilib gettext git libncurses5-dev libssl-dev rsync wget ca-certificates unzip file zstd python3-setuptools swig"
-          
+
           for i in 1 2 3; do
-            echo "尝试 $i: 正在安装 $PACKAGES"
+            echo "Attempt $i: installing $PACKAGES"
             if apt-get update && apt-get install -y $PACKAGES; then
-              echo "✅ 所有软件包已完成安装"
+              echo "Packages installed"
               break
             fi
-            echo "❌ 尝试 $i 失败"
+            echo "Attempt $i failed"
             sleep 3
           done
 
-      - name: 获取 OpenWrt SDK 压缩包缓存
+      - name: Cache OpenWrt SDK archive
         id: cache-openwrt-sdk
         uses: actions/cache@v5
         with:
           path: |
             ${{ env.SDK_NAME }}.tar.zst
-          key: openwrt-mediatek_filogic-ipk-sdk-${{ inputs.sdk_version }}
+          key: openwrt-mediatek_filogic-ipk-sdk-${{ inputs.sdk_version || '24.10.6' }}
 
-      - name: 下载 SDK
+      - name: Download SDK
         if: steps.cache-openwrt-sdk.outputs.cache-hit != 'true'
         run: |
           wget ${{ env.SDK_URL }}/${{ env.SDK_NAME }}.tar.zst -O ${{ env.SDK_NAME }}.tar.zst
 
-      - name: 解压 SDK
+      - name: Extract SDK
         run: |
           tar -I zstd -xf ${{ env.SDK_NAME }}.tar.zst
           mv ${{ env.SDK_NAME }} openwrt-sdk
@@ -75,59 +91,59 @@ jobs:
 
           make defconfig
 
-      - name: 获取 OpenWrt 缓存
+      - name: Cache OpenWrt build outputs
         id: cache-openwrt
         uses: actions/cache@v5
         with:
           path: |
             openwrt-sdk/staging_dir/
             openwrt-sdk/dl/
-          key: openwrt-mediatek_filogic-sdk-${{ inputs.sdk_version }}-${{ hashFiles('.configs/mediatek_filogic-ipk.config') }}
+          key: openwrt-mediatek_filogic-sdk-${{ inputs.sdk_version || '24.10.6' }}-${{ hashFiles('.configs/mediatek_filogic-ipk.config') }}
 
-      - name: 准备构建配置
+      - name: Prepare build config
         if: steps.cache-openwrt.outputs.cache-hit != 'true'
         run: |
           cd openwrt-sdk
 
           scripts/feeds update base
           scripts/feeds update packages
-          
+
           scripts/feeds install openssl
           scripts/feeds install curl
-          
+
           make defconfig
-          
+
           cat ../.configs/mediatek_filogic-ipk.config >> .config
 
           make defconfig
 
-      - name: 编译 libopenssl
+      - name: Build libopenssl
         if: steps.cache-openwrt.outputs.cache-hit != 'true'
         run: |
           cd openwrt-sdk
           make package/openssl/compile -j$(nproc)
 
-      - name: 编译 libcurl
+      - name: Build libcurl
         if: steps.cache-openwrt.outputs.cache-hit != 'true'
         run: |
           cd openwrt-sdk
           make package/curl/compile -j$(nproc)
 
-      - name: 编译 esurfingclient
+      - name: Build esurfingclient
         run: |
           cp -r esurfingclient openwrt-sdk/package/
-          
+
           cd openwrt-sdk
-          
+
           make defconfig
 
           make package/esurfingclient/compile -j$(nproc) V=s
 
-          find bin/packages -name "esurfingclient*.ipk" -exec cp {} ../esurfingclient_${{ inputs.version }}-${{ inputs.release }}_mediatek_filogic.ipk \;
+          find bin/packages -name "esurfingclient*.ipk" -exec cp {} ../esurfingclient_${{ inputs.version || '2.0.4' }}-${{ inputs.release || '6' }}_mediatek_filogic.ipk \;
 
-      - name: 上传工件
+      - name: Upload artifact
         uses: actions/upload-artifact@v7
         with:
-          name: esurfingclient_${{ inputs.version }}-${{ inputs.release }}_mediatek_filogic-ipk
-          path: esurfingclient_${{ inputs.version }}-${{ inputs.release }}_mediatek_filogic.ipk
+          name: esurfingclient_${{ inputs.version || '2.0.4' }}-${{ inputs.release || '6' }}_mediatek_filogic-ipk
+          path: esurfingclient_${{ inputs.version || '2.0.4' }}-${{ inputs.release || '6' }}_mediatek_filogic.ipk
           retention-days: 30

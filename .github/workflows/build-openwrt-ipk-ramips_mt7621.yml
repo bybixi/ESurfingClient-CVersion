@@ -36,8 +36,8 @@ jobs:
 
       - name: 更新 Makefile 版本号
         run: |
-          sed -i "s/PKG_VERSION:=.*/PKG_VERSION:=${{ inputs.version }}/" esurfingclient/Makefile
-          sed -i "s/PKG_RELEASE:=.*/PKG_RELEASE:=${{ inputs.release }}/" esurfingclient/Makefile
+          sed -i "s/PKG_VERSION:=.*/PKG_VERSION:=${{ inputs.version || '2.0.4' }}/" esurfingclient/Makefile
+          sed -i "s/PKG_RELEASE:=.*/PKG_RELEASE:=${{ inputs.release || '6' }}/" esurfingclient/Makefile
 
       - name: 安装软件包 (最多重试 3 次)
         run: |
@@ -59,7 +59,7 @@ jobs:
         with:
           path: |
             ${{ env.SDK_NAME }}.tar.zst
-          key: openwrt-ramips_mt7621-ipk-sdk-${{ inputs.sdk_version }}
+          key: openwrt-ramips_mt7621-ipk-sdk-${{ inputs.sdk_version || '24.10.6' }}
 
       - name: 下载 SDK
         if: steps.cache-openwrt-sdk.outputs.cache-hit != 'true'
@@ -82,7 +82,7 @@ jobs:
           path: |
             openwrt-sdk/staging_dir/
             openwrt-sdk/dl/
-          key: openwrt-ramips_mt7621-sdk-${{ inputs.sdk_version }}-${{ hashFiles('.configs/ramips_mt7621-ipk.config') }}
+          key: openwrt-ramips_mt7621-sdk-${{ inputs.sdk_version || '24.10.6' }}-${{ hashFiles('.configs/ramips_mt7621-ipk.config') }}
 
       - name: 准备构建配置
         if: steps.cache-openwrt.outputs.cache-hit != 'true'
@@ -123,11 +123,11 @@ jobs:
 
           make package/esurfingclient/compile -j$(nproc) V=s
 
-          find bin/packages -name "esurfingclient*.ipk" -exec cp {} ../esurfingclient_${{ inputs.version }}-${{ inputs.release }}_ramips_mt7621.ipk \;
+          find bin/packages -name "esurfingclient*.ipk" -exec cp {} ../esurfingclient_${{ inputs.version || '2.0.4' }}-${{ inputs.release || '6' }}_ramips_mt7621.ipk \;
 
       - name: 上传工件
         uses: actions/upload-artifact@v7
         with:
-          name: esurfingclient_${{ inputs.version }}-${{ inputs.release }}_ramips_mt7621-ipk
-          path: esurfingclient_${{ inputs.version }}-${{ inputs.release }}_ramips_mt7621.ipk
+          name: esurfingclient_${{ inputs.version || '2.0.4' }}-${{ inputs.release || '6' }}_ramips_mt7621-ipk
+          path: esurfingclient_${{ inputs.version || '2.0.4' }}-${{ inputs.release || '6' }}_ramips_mt7621.ipk
           retention-days: 30
