@@ -15,7 +15,7 @@ extern void stop_web_server();
 extern bool get_service_mode();
 #endif
 
-void shut(const uint8_t exit_code)
+void shut(const int8_t exit_code)
 {
     LOG_INFO("主程序正在关闭");
 

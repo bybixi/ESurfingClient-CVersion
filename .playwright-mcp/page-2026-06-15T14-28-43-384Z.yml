@@ -1,0 +1,316 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - link "Skip to content" [ref=e4] [cursor=pointer]:
+      - /url: "#start-of-content"
+    - banner [ref=e6]:
+      - heading "Navigation Menu" [level=2] [ref=e7]
+      - generic [ref=e8]:
+        - link "Homepage" [ref=e10] [cursor=pointer]:
+          - /url: /
+          - img [ref=e11]
+        - generic [ref=e13]:
+          - navigation "Global" [ref=e16]:
+            - list [ref=e17]:
+              - listitem [ref=e18]:
+                - button "Platform" [ref=e20] [cursor=pointer]:
+                  - text: Platform
+                  - img [ref=e21]
+              - listitem [ref=e23]:
+                - button "Solutions" [ref=e25] [cursor=pointer]:
+                  - text: Solutions
+                  - img [ref=e26]
+              - listitem [ref=e28]:
+                - button "Resources" [ref=e30] [cursor=pointer]:
+                  - text: Resources
+                  - img [ref=e31]
+              - listitem [ref=e33]:
+                - button "Open Source" [ref=e35] [cursor=pointer]:
+                  - text: Open Source
+                  - img [ref=e36]
+              - listitem [ref=e38]:
+                - button "Enterprise" [ref=e40] [cursor=pointer]:
+                  - text: Enterprise
+                  - img [ref=e41]
+              - listitem [ref=e43]:
+                - link "Pricing" [ref=e44] [cursor=pointer]:
+                  - /url: https://github.com/pricing
+                  - generic [ref=e45]: Pricing
+          - generic [ref=e46]:
+            - button "Search or jump to…" [ref=e49] [cursor=pointer]:
+              - img [ref=e51]
+            - link "Sign in" [ref=e54] [cursor=pointer]:
+              - /url: /login?return_to=https%3A%2F%2Fgithub.com%2Fbybixi%2FESurfingClient-CVersion%2Factions%2Fworkflows%2Fbuild-openwrt-ipk-mediatek_filogic.yml
+            - link "Sign up" [ref=e55] [cursor=pointer]:
+              - /url: /signup?ref_cta=Sign+up&ref_loc=header+logged+out&ref_page=%2F%3Cuser-name%3E%2F%3Crepo-name%3E%2Factions%2Findex&source=header-repo&source_repo=bybixi%2FESurfingClient-CVersion
+            - button "Appearance settings" [ref=e58] [cursor=pointer]:
+              - img
+  - main [ref=e62]:
+    - generic [ref=e63]:
+      - generic [ref=e64]:
+        - generic [ref=e65]:
+          - generic [ref=e66]:
+            - img [ref=e67]
+            - link "bybixi" [ref=e70] [cursor=pointer]:
+              - /url: /bybixi
+            - generic [ref=e71]: /
+            - strong [ref=e72]:
+              - link "ESurfingClient-CVersion" [ref=e73] [cursor=pointer]:
+                - /url: /bybixi/ESurfingClient-CVersion
+            - generic [ref=e74]: Public
+          - generic [ref=e75]:
+            - text: forked from
+            - link "BadGhost520/ESurfingClient-CVersion" [ref=e76] [cursor=pointer]:
+              - /url: /BadGhost520/ESurfingClient-CVersion
+        - generic [ref=e77]:
+          - list:
+            - listitem [ref=e78]:
+              - link "You must be signed in to change notification settings" [ref=e79] [cursor=pointer]:
+                - /url: /login?return_to=%2Fbybixi%2FESurfingClient-CVersion
+                - img [ref=e80]
+                - text: Notifications
+            - listitem [ref=e82]:
+              - link "Fork 0" [ref=e83] [cursor=pointer]:
+                - /url: /login?return_to=%2Fbybixi%2FESurfingClient-CVersion
+                - img [ref=e84]
+                - text: Fork
+                - generic "0" [ref=e86]
+            - listitem [ref=e87]:
+              - link "You must be signed in to star a repository" [ref=e89] [cursor=pointer]:
+                - /url: /login?return_to=%2Fbybixi%2FESurfingClient-CVersion
+                - img [ref=e90]
+                - text: Star
+                - generic "1 user starred this repository" [ref=e92]: "1"
+      - navigation "Repository" [ref=e93]:
+        - list [ref=e94]:
+          - listitem [ref=e95]:
+            - link "Code" [ref=e96] [cursor=pointer]:
+              - /url: /bybixi/ESurfingClient-CVersion
+              - img [ref=e97]
+              - generic [ref=e99]: Code
+          - listitem [ref=e100]:
+            - link "Pull requests" [ref=e101] [cursor=pointer]:
+              - /url: /bybixi/ESurfingClient-CVersion/pulls
+              - img [ref=e102]
+              - generic [ref=e104]: Pull requests
+          - listitem [ref=e105]:
+            - link "Actions" [ref=e106] [cursor=pointer]:
+              - /url: /bybixi/ESurfingClient-CVersion/actions
+              - img [ref=e107]
+              - generic [ref=e109]: Actions
+          - listitem [ref=e110]:
+            - link "Projects" [ref=e111] [cursor=pointer]:
+              - /url: /bybixi/ESurfingClient-CVersion/projects
+              - img [ref=e112]
+              - generic [ref=e114]: Projects
+          - listitem [ref=e115]:
+            - link "Security and quality" [ref=e116] [cursor=pointer]:
+              - /url: /bybixi/ESurfingClient-CVersion/security
+              - img [ref=e117]
+              - generic [ref=e119]: Security and quality
+          - listitem [ref=e120]:
+            - link "Insights" [ref=e121] [cursor=pointer]:
+              - /url: /bybixi/ESurfingClient-CVersion/pulse
+              - img [ref=e122]
+              - generic [ref=e124]: Insights
+    - generic [ref=e126]:
+      - 'heading "Actions: bybixi/ESurfingClient-CVersion" [level=1] [ref=e127]'
+      - generic [ref=e130]:
+        - generic [ref=e131]:
+          - heading "Actions" [level=2] [ref=e133]
+          - navigation "Actions Workflows" [ref=e137]:
+            - list [ref=e139]:
+              - listitem [ref=e140]:
+                - link "All workflows" [ref=e141] [cursor=pointer]:
+                  - /url: /bybixi/ESurfingClient-CVersion/actions
+                  - generic [ref=e142]: All workflows
+              - listitem [ref=e143]
+              - listitem [ref=e144]:
+                - generic [ref=e147]:
+                  - list "Workflows" [ref=e148]:
+                    - listitem [ref=e149]:
+                      - link "Build All Platforms" [ref=e150] [cursor=pointer]:
+                        - /url: /bybixi/ESurfingClient-CVersion/actions/workflows/build-all-platforms.yml
+                        - generic [ref=e151]: Build All Platforms
+                    - listitem [ref=e152]:
+                      - link "Build Desktop arm64 macOS Binary" [ref=e153] [cursor=pointer]:
+                        - /url: /bybixi/ESurfingClient-CVersion/actions/workflows/build-desktop-arm64-macos.yml
+                        - generic [ref=e154]: Build Desktop arm64 macOS Binary
+                    - listitem [ref=e155]:
+                      - link "Build Desktop x86_64 Linux Binary" [ref=e156] [cursor=pointer]:
+                        - /url: /bybixi/ESurfingClient-CVersion/actions/workflows/build-desktop-x86_64-linux.yml
+                        - generic [ref=e157]: Build Desktop x86_64 Linux Binary
+                    - listitem [ref=e158]:
+                      - link "Build Desktop x86_64 macOS Binary" [ref=e159] [cursor=pointer]:
+                        - /url: /bybixi/ESurfingClient-CVersion/actions/workflows/build-desktop-x86_64-macos.yml
+                        - generic [ref=e160]: Build Desktop x86_64 macOS Binary
+                    - listitem [ref=e161]:
+                      - link "Build Desktop x86_64 Windows Binary" [ref=e162] [cursor=pointer]:
+                        - /url: /bybixi/ESurfingClient-CVersion/actions/workflows/build-desktop-x86_64-windows.yml
+                        - generic [ref=e163]: Build Desktop x86_64 Windows Binary
+                    - listitem [ref=e164]:
+                      - link "Build LuCI APK" [ref=e165] [cursor=pointer]:
+                        - /url: /bybixi/ESurfingClient-CVersion/actions/workflows/build-openwrt-luci-apk-all.yml
+                        - generic [ref=e166]: Build LuCI APK
+                    - listitem [ref=e167]:
+                      - link "Build LuCI IPK" [ref=e168] [cursor=pointer]:
+                        - /url: /bybixi/ESurfingClient-CVersion/actions/workflows/build-openwrt-luci-ipk-all.yml
+                        - generic [ref=e169]: Build LuCI IPK
+                    - listitem [ref=e170]:
+                      - link "Build OpenWrt mediatek_filogic APK" [ref=e171] [cursor=pointer]:
+                        - /url: /bybixi/ESurfingClient-CVersion/actions/workflows/build-openwrt-apk-mediatek_filogic.yml
+                        - generic [ref=e172]: Build OpenWrt mediatek_filogic APK
+                    - listitem [ref=e173]:
+                      - link "Build OpenWrt mediatek_filogic IPK" [ref=e174] [cursor=pointer]:
+                        - /url: /bybixi/ESurfingClient-CVersion/actions/workflows/build-openwrt-ipk-mediatek_filogic.yml
+                        - generic [ref=e175]: Build OpenWrt mediatek_filogic IPK
+                    - listitem [ref=e176]:
+                      - link "Build OpenWrt qualcommax_ipq60xx APK" [ref=e177] [cursor=pointer]:
+                        - /url: /bybixi/ESurfingClient-CVersion/actions/workflows/build-openwrt-apk-qualcommax_ipq60xx.yml
+                        - generic [ref=e178]: Build OpenWrt qualcommax_ipq60xx APK
+                  - button "Show more workflows..." [ref=e180] [cursor=pointer]:
+                    - generic [ref=e181]: Show more workflows...
+              - listitem [ref=e182]
+              - listitem [ref=e183]:
+                - generic [ref=e186]:
+                  - heading "Management" [level=3] [ref=e188]
+                  - list "Management" [ref=e189]:
+                    - listitem [ref=e190]:
+                      - link "Caches" [ref=e191] [cursor=pointer]:
+                        - /url: /bybixi/ESurfingClient-CVersion/actions/caches
+                        - generic:
+                          - img
+                        - generic [ref=e192]: Caches
+        - generic [ref=e195]:
+          - generic [ref=e196]:
+            - generic [ref=e197]:
+              - heading "Build OpenWrt mediatek_filogic IPK" [level=2] [ref=e199]:
+                - generic [ref=e201]: Build OpenWrt mediatek_filogic IPK
+              - generic [ref=e202]:
+                - search [ref=e205]:
+                  - combobox "Filter workflow runs" [ref=e206]
+                  - img
+                - button "Show workflow options" [ref=e209] [cursor=pointer]:
+                  - img
+            - link "build-openwrt-ipk-mediatek_filogic.yml" [ref=e211] [cursor=pointer]:
+              - /url: /bybixi/ESurfingClient-CVersion/blob/master/.github/workflows/build-openwrt-ipk-mediatek_filogic.yml
+          - generic [ref=e212]:
+            - generic [ref=e213]:
+              - strong [ref=e216]: 4 workflow runs
+              - generic [ref=e217]:
+                - button "Event" [ref=e221] [cursor=pointer]:
+                  - generic [ref=e223]: Event
+                  - generic:
+                    - img
+                - button "Status" [ref=e227] [cursor=pointer]:
+                  - generic [ref=e229]: Status
+                  - generic:
+                    - img
+                - button "Branch" [ref=e233] [cursor=pointer]:
+                  - generic [ref=e235]: Branch
+                  - generic:
+                    - img
+                - button "Actor" [ref=e239] [cursor=pointer]:
+                  - generic [ref=e241]: Actor
+                  - generic:
+                    - img
+            - generic [ref=e242]:
+              - generic [ref=e244]:
+                - generic [ref=e245]:
+                  - 'link "completed successfully: Run 4 of Build OpenWrt mediatek_filogic IPK." [ref=e246] [cursor=pointer]':
+                    - /url: /bybixi/ESurfingClient-CVersion/actions/runs/27547327871
+                    - img "completed successfully:" [ref=e248]
+                    - generic [ref=e250]: Build OpenWrt mediatek_filogic IPK
+                  - generic [ref=e251]:
+                    - text: "Build OpenWrt mediatek_filogic IPK #4:"
+                    - generic [ref=e252]:
+                      - text: Manually run by
+                      - link "bybixi" [ref=e253] [cursor=pointer]:
+                        - /url: /bybixi
+                - link "master" [ref=e255] [cursor=pointer]:
+                  - /url: /bybixi/ESurfingClient-CVersion/tree/refs/heads/master
+                - generic [ref=e257]:
+                  - generic [ref=e258]:
+                    - generic [ref=e259]:
+                      - img [ref=e261]
+                      - generic "Jun 15, 2026, 20:48 GMT+8" [ref=e263]: Today at 20:48
+                    - generic [ref=e264]:
+                      - img "Run duration" [ref=e265]
+                      - text: 5m 37s
+                  - group [ref=e268]:
+                    - generic "Show options" [ref=e269] [cursor=pointer]:
+                      - img "Show options" [ref=e270]
+              - generic [ref=e273]:
+                - generic [ref=e274]:
+                  - 'link "failed: Run 3 of Build OpenWrt mediatek_filogic IPK." [ref=e275] [cursor=pointer]':
+                    - /url: /bybixi/ESurfingClient-CVersion/actions/runs/27545464366
+                    - img "failed:" [ref=e277]
+                    - generic [ref=e279]: Build OpenWrt mediatek_filogic IPK
+                  - generic [ref=e280]:
+                    - text: "Build OpenWrt mediatek_filogic IPK #3:"
+                    - generic [ref=e281]:
+                      - text: Manually run by
+                      - link "bybixi" [ref=e282] [cursor=pointer]:
+                        - /url: /bybixi
+                - link "master" [ref=e284] [cursor=pointer]:
+                  - /url: /bybixi/ESurfingClient-CVersion/tree/refs/heads/master
+                - generic [ref=e286]:
+                  - generic [ref=e287]:
+                    - generic [ref=e288]:
+                      - img [ref=e290]
+                      - generic "Jun 15, 2026, 20:14 GMT+8" [ref=e292]: Today at 20:14
+                    - generic [ref=e293]:
+                      - img "Run duration" [ref=e294]
+                      - text: 4m 54s
+                  - group [ref=e297]:
+                    - generic "Show options" [ref=e298] [cursor=pointer]:
+                      - img "Show options" [ref=e299]
+              - generic [ref=e302]:
+                - generic [ref=e303]:
+                  - 'link "failed: Run 2 of Build OpenWrt mediatek_filogic IPK." [ref=e304] [cursor=pointer]':
+                    - /url: /bybixi/ESurfingClient-CVersion/actions/runs/27544973885
+                    - img "failed:" [ref=e306]
+                    - generic [ref=e308]: Build OpenWrt mediatek_filogic IPK
+                  - generic [ref=e309]:
+                    - text: "Build OpenWrt mediatek_filogic IPK #2:"
+                    - generic [ref=e310]:
+                      - text: Manually run by
+                      - link "bybixi" [ref=e311] [cursor=pointer]:
+                        - /url: /bybixi
+                - link "master" [ref=e313] [cursor=pointer]:
+                  - /url: /bybixi/ESurfingClient-CVersion/tree/refs/heads/master
+                - generic [ref=e315]:
+                  - generic [ref=e316]:
+                    - generic [ref=e317]:
+                      - img [ref=e319]
+                      - generic "Jun 15, 2026, 20:04 GMT+8" [ref=e321]: Today at 20:04
+                    - generic [ref=e322]:
+                      - img "Run duration" [ref=e323]
+                      - text: 4m 57s
+                  - group [ref=e326]:
+                    - generic "Show options" [ref=e327] [cursor=pointer]:
+                      - img "Show options" [ref=e328]
+              - generic [ref=e331]:
+                - generic [ref=e332]:
+                  - 'link "failed: Run 1 of Build OpenWrt mediatek_filogic IPK." [ref=e333] [cursor=pointer]':
+                    - /url: /bybixi/ESurfingClient-CVersion/actions/runs/27543708733
+                    - img "failed:" [ref=e335]
+                    - generic [ref=e337]: Build OpenWrt mediatek_filogic IPK
+                  - generic [ref=e338]:
+                    - text: "Build OpenWrt mediatek_filogic IPK #1:"
+                    - generic [ref=e339]:
+                      - text: Manually run by
+                      - link "bybixi" [ref=e340] [cursor=pointer]:
+                        - /url: /bybixi
+                - link "master" [ref=e342] [cursor=pointer]:
+                  - /url: /bybixi/ESurfingClient-CVersion/tree/refs/heads/master
+                - generic [ref=e344]:
+                  - generic [ref=e345]:
+                    - generic [ref=e346]:
+                      - img [ref=e348]
+                      - generic "Jun 15, 2026, 19:40 GMT+8" [ref=e350]: Today at 19:40
+                    - generic [ref=e351]:
+                      - img "Run duration" [ref=e352]
+                      - text: 5m 20s
+                  - group [ref=e355]:
+                    - generic "Show options" [ref=e356] [cursor=pointer]:
+                      - img "Show options" [ref=e357]

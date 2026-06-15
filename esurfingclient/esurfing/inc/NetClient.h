@@ -43,6 +43,13 @@ http_resp_t post(const char* url, const char* data);
  */
 http_resp_t get(const char* url);
 
+
+/**
+ * @brief 重置网络状态 (school_id, domain, area)
+ * 在重新连接前调用, 防止使用过期的认证参数
+ */
+void reset_network_state();
+
 /**
  * @brief 检测网络状态
  * @return 网络状态

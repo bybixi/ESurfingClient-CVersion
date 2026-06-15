@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "mcp__playwright-chrome__browser_click"
+      "mcp__playwright-chrome__browser_click",
+      "mcp__playwright-chrome__browser_navigate"
     ]
   }
 }

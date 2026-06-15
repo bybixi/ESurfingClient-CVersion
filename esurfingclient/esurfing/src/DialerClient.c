@@ -71,7 +71,7 @@ static bool term()
         }
         LOG_ERROR("配置 %" PRIu8 " 登出失败, 下标 %" PRIu8 ", 错误代码: %d, 重试: 第 %" PRIu8 " 次, 最多 5 次", g_prog_status[tl_thread_idx].login_cfg.idx, tl_thread_idx, result.status, retry);
         retry++;
-        sleep_ms(1000);
+        sleep_ms(1000, true);
         result = post(g_prog_status[tl_thread_idx].auth_cfg.term_url, encrypt); // 向 term_url 发送加密数据 (重试)
     }
     free(encrypt);
@@ -480,7 +480,7 @@ static AuthStatus auth()
 
     g_prog_status[tl_thread_idx].runtime_status.is_authed = true;
     LOG_INFO("已认证登录");
-    sleep_ms(5000);
+    sleep_ms(5000, true);
     return AUTH_SUCCESS;
 }
 
@@ -547,7 +547,7 @@ static RunStatus run()
                             tl_thread_idx,
                             retry_heartbeat);
                         retry_heartbeat++;
-                        sleep_ms(1000);
+                        sleep_ms(1000, true);
                     }
                     LOG_INFO("下一次重试: %" PRIu64 " 秒后",
                         g_prog_status[tl_thread_idx].auth_cfg.keep_retry);
@@ -559,7 +559,7 @@ static RunStatus run()
         {
             LOG_INFO("已连接至互联网");
         }
-        sleep_ms(1000);
+        sleep_ms(1000, true);
         return RUN_SUCCESS;
     case REQUEST_REDIRECT: // 返回重定向 (302 响应码)
         retry_timeout = 1;
@@ -588,7 +588,7 @@ static RunStatus run()
                 retry_auth_time,
                 retry_auth_time / 1000);
             retry_auth++;
-            sleep_ms(retry_auth_time);
+            sleep_ms(retry_auth_time, true);
         }
         return RUN_SUCCESS;
     case REQUEST_WARN: // 返回警告, 会重试 (错误码 28, 响应超时)
@@ -600,14 +600,14 @@ static RunStatus run()
         }
         LOG_WARN("网络响应超时, 等待 10 秒后重试, 重试: 第 %" PRIu8 " 次, 最多 5 次",
             retry_timeout);
-        sleep_ms(10000);
+        sleep_ms(10000, true);
         retry_timeout++;
         return TIMEOUT_RETRY;
     default:
         retry_timeout = 1;
         retry_auth = 1;
         LOG_ERROR("其它错误");
-        sleep_ms(5000);
+        sleep_ms(5000, true);
         return RUN_FAILED;
     }
 }
@@ -688,7 +688,7 @@ void work()
         {
         case REQUEST_SUCCESS:
             LOG_INFO("已连接到互联网");
-            sleep_ms(10000);
+            sleep_ms(10000, true);
             break;
         case REQUEST_ERROR:
         case REQUEST_INIT_ERROR:
@@ -699,10 +699,10 @@ void work()
             }
             LOG_ERROR("网络错误, 重试: 第 %" PRIu8 " 次, 最多 5 次", retry);
             retry++;
-            sleep_ms(5000);
+            sleep_ms(5000, true);
             break;
         default:
-            sleep_ms(1000);
+            sleep_ms(1000, true);
             break;
         }
     } while (status != REQUEST_REDIRECT && status != REQUEST_SUCCESS);
@@ -732,7 +732,7 @@ void work()
      * 线程守护
      * 登录时间检测
      */
-    sleep_ms(5000);
+    sleep_ms(5000, true);
     LOG_INFO("线程守护开启");
     uint64_t check_time = 0;
     while (g_thread_keep_alive)
@@ -770,7 +770,7 @@ void work()
                         }
                         LOG_DEBUG("等待配置 %" PRIu8 " 登出, 下标 %" PRIu8 ", 等待次数: %" PRIu8 ", 最多 5 次", g_prog_status[j].login_cfg.idx, j, retry);
                         retry++;
-                        sleep_ms(2000);
+                        sleep_ms(2000, true);
                     }
                 }
             }
@@ -805,11 +805,11 @@ void work()
                 }
                 while (g_prog_status[i].runtime_status.is_running == false)
                 {
-                    sleep_ms(100);
+                    sleep_ms(100, true);
                 }
             }
         }
-        sleep_ms(10);
+        sleep_ms(10, true);
         check_time += 10;
     }
     LOG_INFO("线程守护已关闭");
@@ -819,6 +819,6 @@ void work()
 #endif
         )
     {
-        sleep_ms(10000);
+        sleep_ms(10000, true);
     }
 }

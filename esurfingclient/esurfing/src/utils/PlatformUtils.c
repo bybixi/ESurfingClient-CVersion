@@ -264,13 +264,13 @@ void get_rand_bytes(uint8_t* buf, const size_t len)
 #endif
 }
 
-void sleep_ms(const uint64_t ms)
+void sleep_ms(const uint64_t ms, const bool can_stop)
 {
     if (ms == 0) return;
 
     uint64_t elapsed = 0;
 
-    while (elapsed < ms && g_thread_keep_alive)
+    while (elapsed < ms && (can_stop ? g_thread_keep_alive : true))
     {
         if (tl_thread_idx != -1)
         {
@@ -476,7 +476,7 @@ char* clean_CDATA(const char* text)
     return extract_between_tags(text, "<![CDATA[", "]]>");
 }
 
-bool save_cfg()
+bool save_cfg(char* configs_str)
 {
     LOG_INFO("保存配置中");
     LOG_INFO("仅会保存第一个可用配置");
@@ -527,7 +527,7 @@ bool load_cfg()
             {
                 return false;
             }
-            sleep_ms(10000);
+            sleep_ms(10000, true);
         }
     }
     snprintf(config_file, PATH_MAX + 1 + sizeof(DIALER_CONFIG_FILE), "%s%c%s", safe_str(dir), SEP, DIALER_CONFIG_FILE);
@@ -549,7 +549,7 @@ bool load_cfg()
                 {
                     return false;
                 }
-                sleep_ms(10000);
+                sleep_ms(10000, true);
             }
         }
         fprintf(new_cfg, "%s", s_default_cfg);
@@ -561,7 +561,7 @@ bool load_cfg()
             {
                 return false;
             }
-            sleep_ms(10000);
+            sleep_ms(10000, true);
         }
     }
 
@@ -585,7 +585,7 @@ bool load_cfg()
             {
                 return false;
             }
-            sleep_ms(10000);
+            sleep_ms(10000, true);
         }
     }
 
@@ -610,7 +610,7 @@ bool load_cfg()
                 return false;
             }
             g_prog_enabled = false;
-            sleep_ms(10000);
+            sleep_ms(10000, true);
         }
     }
     if (cJSON_IsFalse(enabled))
@@ -623,7 +623,7 @@ bool load_cfg()
                 return false;
             }
             g_prog_enabled = false;
-            sleep_ms(10000);
+            sleep_ms(10000, true);
         }
     }
     g_prog_enabled = true;
@@ -639,7 +639,7 @@ bool load_cfg()
             {
                 return false;
             }
-            sleep_ms(10000);
+            sleep_ms(10000, true);
         }
     }
 
@@ -861,7 +861,7 @@ bool load_cfg()
             {
                 return false;
             }
-            sleep_ms(10000);
+            sleep_ms(10000, true);
         }
     }
 
