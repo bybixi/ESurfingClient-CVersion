@@ -34,6 +34,14 @@ static char s_school_id[SCHOOL_ID_LENGTH];
 static char s_domain[DOMAIN_LENGTH];
 static char s_area[AREA_LENGTH];
 
+void reset_network_state()
+{
+    memset(s_school_id, 0, sizeof(s_school_id));
+    memset(s_domain, 0, sizeof(s_domain));
+    memset(s_area, 0, sizeof(s_area));
+    LOG_INFO("已重置网络状态 (school_id/domain/area)");
+}
+
 char* extract_url_param(const char* url, const char* search_str_start)
 {
     if (url == NULL)
@@ -41,16 +49,33 @@ char* extract_url_param(const char* url, const char* search_str_start)
         LOG_ERROR("URL 为空");
         return NULL;
     }
-    const size_t len = strlen(search_str_start);
-    char* search_pattern = malloc(len + 2);
+    const size_t key_len = strlen(search_str_start);
+    char* search_pattern = malloc(key_len + 2);
     if (search_pattern == NULL)
     {
         LOG_ERROR("分配内存失败");
         return NULL;
     }
-    snprintf(search_pattern, len + 2, "%s=", search_str_start);
-    char* result = extract_between_tags(url, search_pattern, "&");
+    snprintf(search_pattern, key_len + 2, "%s=", search_str_start);
+
+    const char* start = strstr(url, search_pattern);
     free(search_pattern);
+    if (start == NULL)
+    {
+        LOG_ERROR("未找到 URL 参数: %s", search_str_start);
+        return NULL;
+    }
+    start += key_len + 1;
+
+    const size_t value_len = strcspn(start, "&#");
+    char* result = malloc(value_len + 1);
+    if (result == NULL)
+    {
+        LOG_ERROR("分配内存失败");
+        return NULL;
+    }
+    memcpy(result, start, value_len);
+    result[value_len] = '\0';
     return result;
 }
 
@@ -358,6 +383,8 @@ http_resp_t post(const char* url, const char* data)
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_cb);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &resp);
     curl_easy_setopt(curl, CURLOPT_TIMEOUT, 10L);
+    curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 5L);
+    curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
 
 #ifdef __OPENWRT__
     curl_easy_setopt(curl, CURLOPT_OPENSOCKETFUNCTION, open_socket_callback);
@@ -444,6 +471,8 @@ http_resp_t get(const char* url)
     LOG_VERBOSE("设置 curl 选项");
     curl_easy_setopt(curl, CURLOPT_URL, url);
     curl_easy_setopt(curl, CURLOPT_TIMEOUT, 10L);
+    curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 5L);
+    curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
     curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 0L);
     if (tl_thread_idx != -1)
     {
@@ -506,19 +535,50 @@ NetworkStatus check_network_status()
     if (resp.curl_code == CURLE_COULDNT_RESOLVE_HOST)
     {
         LOG_WARN("DNS 解析错误, 使用备用超时方案重试");
+        if (resp.body_data) { free(resp.body_data); resp.body_data = NULL; }
         resp = get(s_backup_generate_url);
         if (resp.status == REQUEST_WARN)
         {
             resp.status = REQUEST_SUCCESS;
         }
     }
-    return resp.status;
+    const NetworkStatus status = resp.status;
+    if (resp.body_data) free(resp.body_data);
+    return status;
 }
 
 static void get_school_ip_symbol()
 {
-    const char* school_ip = extract_url_param(g_prog_status[0].last_location, "wlanuserip");
-    snprintf(g_school_network_symbol, SCHOOL_NETWORK_SYMBOL, "%s", safe_str(extract_between_tags(school_ip, "", strchr(strchr(school_ip, '.') + 1, '.'))));
+    if (tl_thread_idx < 0)
+    {
+        LOG_WARN("未在线程上下文中获取校园网标志");
+        snprintf(g_school_network_symbol, SCHOOL_NETWORK_SYMBOL, "%s", "");
+        return;
+    }
+
+    char* school_ip = extract_url_param(g_prog_status[tl_thread_idx].last_location, "wlanuserip");
+    if (school_ip == NULL)
+    {
+        LOG_WARN("未获取到 wlanuserip, 使用空校园网标志");
+        snprintf(g_school_network_symbol, SCHOOL_NETWORK_SYMBOL, "%s", "");
+        return;
+    }
+
+    char* first_dot = strchr(school_ip, '.');
+    char* second_dot = first_dot ? strchr(first_dot + 1, '.') : NULL;
+    if (second_dot == NULL)
+    {
+        LOG_WARN("wlanuserip 格式异常: %s", school_ip);
+        snprintf(g_school_network_symbol, SCHOOL_NETWORK_SYMBOL, "%s", "");
+        free(school_ip);
+        return;
+    }
+
+    const size_t symbol_len = second_dot - school_ip;
+    const size_t copy_len = symbol_len >= SCHOOL_NETWORK_SYMBOL ? SCHOOL_NETWORK_SYMBOL - 1 : symbol_len;
+    memcpy(g_school_network_symbol, school_ip, copy_len);
+    g_school_network_symbol[copy_len] = '\0';
+    free(school_ip);
     LOG_INFO("获取到校园网标志: %s", g_school_network_symbol);
 }
 
@@ -529,10 +589,12 @@ NetworkStatus get_last_location()
     uint8_t retry = 1;
     do
     {
+        if (resp.body_data) { free(resp.body_data); resp.body_data = NULL; resp.body_size = 0; }
         resp = get(s_generate_url); // 检测响应码
         if (resp.curl_code == CURLE_COULDNT_RESOLVE_HOST)
         {
             LOG_WARN("DNS 解析错误, 使用备用超时方案重试");
+            if (resp.body_data) { free(resp.body_data); resp.body_data = NULL; resp.body_size = 0; }
             resp = get(s_backup_generate_url);
             if (resp.status == REQUEST_WARN)
             {
@@ -546,22 +608,37 @@ NetworkStatus get_last_location()
         case REQUEST_SUCCESS:
             retry = 1;
             LOG_INFO("已连接至互联网");
-            sleep_ms(10000, true);
+            sleep_ms(10000);
             break;
         default:
             if (retry > 5)
             {
                 LOG_FATAL("超过最多重试次数");
+                if (resp.body_data) free(resp.body_data);
                 return REQUEST_ERROR;
             }
             LOG_WARN("非重定向, 响应码: %d, 重试: 第 %" PRIu8 " 次, 最多 5 次", resp.status, retry);
             retry++;
-            sleep_ms(1000, true);
+            sleep_ms(1000);
             break;
         }
     } while (resp.status != REQUEST_REDIRECT);
 
-    while (resp.status == REQUEST_REDIRECT) resp = get(g_prog_status[tl_thread_idx].last_location);
+    if (resp.body_data) { free(resp.body_data); resp.body_data = NULL; resp.body_size = 0; }
+
+    while (resp.status == REQUEST_REDIRECT)
+    {
+        if (!g_thread_keep_alive || g_prog_status[tl_thread_idx].runtime_status.is_running == false)
+        {
+            LOG_WARN("收到退出信号, 中止重定向循环");
+            if (resp.body_data) free(resp.body_data);
+            return REQUEST_ERROR;
+        }
+        if (resp.body_data) { free(resp.body_data); resp.body_data = NULL; resp.body_size = 0; }
+        resp = get(g_prog_status[tl_thread_idx].last_location);
+    }
+
+    if (resp.body_data) free(resp.body_data);
 
     g_prog_status[tl_thread_idx].last_location_lock = true;
     LOG_DEBUG("配置 %" PRIu8 " 获取认证配置 URL: %s", g_prog_status[tl_thread_idx].login_cfg.idx, g_prog_status[tl_thread_idx].last_location);

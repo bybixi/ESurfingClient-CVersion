@@ -1,0 +1,241 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - link "Skip to content" [ref=e4] [cursor=pointer]:
+      - /url: "#start-of-content"
+    - banner [ref=e6]:
+      - heading "Navigation Menu" [level=2] [ref=e7]
+      - generic [ref=e8]:
+        - link "Homepage" [ref=e10] [cursor=pointer]:
+          - /url: /
+          - img [ref=e11]
+        - generic [ref=e13]:
+          - navigation "Global" [ref=e16]:
+            - list [ref=e17]:
+              - listitem [ref=e18]:
+                - button "Platform" [ref=e20] [cursor=pointer]:
+                  - text: Platform
+                  - img [ref=e21]
+              - listitem [ref=e23]:
+                - button "Solutions" [ref=e25] [cursor=pointer]:
+                  - text: Solutions
+                  - img [ref=e26]
+              - listitem [ref=e28]:
+                - button "Resources" [ref=e30] [cursor=pointer]:
+                  - text: Resources
+                  - img [ref=e31]
+              - listitem [ref=e33]:
+                - button "Open Source" [ref=e35] [cursor=pointer]:
+                  - text: Open Source
+                  - img [ref=e36]
+              - listitem [ref=e38]:
+                - button "Enterprise" [ref=e40] [cursor=pointer]:
+                  - text: Enterprise
+                  - img [ref=e41]
+              - listitem [ref=e43]:
+                - link "Pricing" [ref=e44] [cursor=pointer]:
+                  - /url: https://github.com/pricing
+                  - generic [ref=e45]: Pricing
+          - generic [ref=e46]:
+            - button "Search or jump to…" [ref=e49] [cursor=pointer]:
+              - img [ref=e51]
+            - link "Sign in" [ref=e54] [cursor=pointer]:
+              - /url: /login?return_to=https%3A%2F%2Fgithub.com%2Fbybixi%2FESurfingClient-CVersion%2Factions
+            - link "Sign up" [ref=e55] [cursor=pointer]:
+              - /url: /signup?ref_cta=Sign+up&ref_loc=header+logged+out&ref_page=%2F%3Cuser-name%3E%2F%3Crepo-name%3E%2Factions%2Findex&source=header-repo&source_repo=bybixi%2FESurfingClient-CVersion
+            - button "Appearance settings" [ref=e58] [cursor=pointer]:
+              - img
+  - main [ref=e62]:
+    - generic [ref=e63]:
+      - generic [ref=e64]:
+        - generic [ref=e65]:
+          - generic [ref=e66]:
+            - img [ref=e67]
+            - link "bybixi" [ref=e70] [cursor=pointer]:
+              - /url: /bybixi
+            - generic [ref=e71]: /
+            - strong [ref=e72]:
+              - link "ESurfingClient-CVersion" [ref=e73] [cursor=pointer]:
+                - /url: /bybixi/ESurfingClient-CVersion
+            - generic [ref=e74]: Public
+          - generic [ref=e75]:
+            - text: forked from
+            - link "BadGhost520/ESurfingClient-CVersion" [ref=e76] [cursor=pointer]:
+              - /url: /BadGhost520/ESurfingClient-CVersion
+        - generic [ref=e77]:
+          - list:
+            - listitem [ref=e78]:
+              - link "You must be signed in to change notification settings" [ref=e79] [cursor=pointer]:
+                - /url: /login?return_to=%2Fbybixi%2FESurfingClient-CVersion
+                - img [ref=e80]
+                - text: Notifications
+            - listitem [ref=e82]:
+              - link "Fork 0" [ref=e83] [cursor=pointer]:
+                - /url: /login?return_to=%2Fbybixi%2FESurfingClient-CVersion
+                - img [ref=e84]
+                - text: Fork
+                - generic "0" [ref=e86]
+            - listitem [ref=e87]:
+              - link "You must be signed in to star a repository" [ref=e89] [cursor=pointer]:
+                - /url: /login?return_to=%2Fbybixi%2FESurfingClient-CVersion
+                - img [ref=e90]
+                - text: Star
+                - generic "0 users starred this repository" [ref=e92]: "0"
+      - navigation "Repository" [ref=e93]:
+        - list [ref=e94]:
+          - listitem [ref=e95]:
+            - link "Code" [ref=e96] [cursor=pointer]:
+              - /url: /bybixi/ESurfingClient-CVersion
+              - img [ref=e97]
+              - generic [ref=e99]: Code
+          - listitem [ref=e100]:
+            - link "Pull requests" [ref=e101] [cursor=pointer]:
+              - /url: /bybixi/ESurfingClient-CVersion/pulls
+              - img [ref=e102]
+              - generic [ref=e104]: Pull requests
+          - listitem [ref=e105]:
+            - link "Actions" [ref=e106] [cursor=pointer]:
+              - /url: /bybixi/ESurfingClient-CVersion/actions
+              - img [ref=e107]
+              - generic [ref=e109]: Actions
+          - listitem [ref=e110]:
+            - link "Projects" [ref=e111] [cursor=pointer]:
+              - /url: /bybixi/ESurfingClient-CVersion/projects
+              - img [ref=e112]
+              - generic [ref=e114]: Projects
+          - listitem [ref=e115]:
+            - link "Security and quality" [ref=e116] [cursor=pointer]:
+              - /url: /bybixi/ESurfingClient-CVersion/security
+              - img [ref=e117]
+              - generic [ref=e119]: Security and quality
+          - listitem [ref=e120]:
+            - link "Insights" [ref=e121] [cursor=pointer]:
+              - /url: /bybixi/ESurfingClient-CVersion/pulse
+              - img [ref=e122]
+              - generic [ref=e124]: Insights
+    - generic [ref=e337]:
+      - generic [ref=e340]:
+        - link "Build OpenWrt mediatek_filogic IPK" [ref=e343] [cursor=pointer]:
+          - /url: /bybixi/ESurfingClient-CVersion/actions/workflows/build-openwrt-ipk-mediatek_filogic.yml
+          - img [ref=e344]
+          - generic [ref=e346]: Build OpenWrt mediatek_filogic IPK
+        - generic [ref=e347]:
+          - generic [ref=e348]:
+            - img "failed:" [ref=e352]
+            - 'heading "Build OpenWrt mediatek_filogic IPK #3" [level=1] [ref=e354]':
+              - generic [ref=e355]: "Build OpenWrt mediatek_filogic IPK #3"
+          - link "Sign in to view logs" [ref=e358] [cursor=pointer]:
+            - /url: /login?return_to=https%3A%2F%2Fgithub.com%2Fbybixi%2FESurfingClient-CVersion%2Factions%2Fruns%2F27545464366
+      - generic [ref=e359]:
+        - navigation "Workflow run" [ref=e365]:
+          - list [ref=e366]:
+            - listitem [ref=e367]:
+              - link "Summary" [ref=e368] [cursor=pointer]:
+                - /url: /bybixi/ESurfingClient-CVersion/actions/runs/27545464366
+                - generic:
+                  - img
+                - generic [ref=e370]: Summary
+            - generic [ref=e371]:
+              - heading "All jobs" [level=4] [ref=e372]
+              - button "Filter by job status" [ref=e373] [cursor=pointer]:
+                - img [ref=e374]
+            - listitem [ref=e376]
+            - listitem [ref=e377]:
+              - list [ref=e378]:
+                - listitem [ref=e379]:
+                  - link "build" [ref=e380] [cursor=pointer]:
+                    - /url: /bybixi/ESurfingClient-CVersion/actions/runs/27545464366/job/81417576606
+                    - generic:
+                      - img
+                    - generic [ref=e382]: build
+            - listitem [ref=e383]
+            - listitem [ref=e384]:
+              - heading "Run details" [level=3] [ref=e386]
+              - list "Run details" [ref=e387]:
+                - listitem [ref=e388]:
+                  - link "Usage" [ref=e389] [cursor=pointer]:
+                    - /url: /bybixi/ESurfingClient-CVersion/actions/runs/27545464366/usage
+                    - generic:
+                      - img
+                    - generic [ref=e391]: Usage
+                - listitem [ref=e392]:
+                  - link "Workflow file" [ref=e393] [cursor=pointer]:
+                    - /url: /bybixi/ESurfingClient-CVersion/actions/runs/27545464366/workflow
+                    - generic:
+                      - img
+                    - generic [ref=e395]: Workflow file
+        - generic [ref=e397]:
+          - region "Workflow run summary" [ref=e398]:
+            - generic [ref=e399]:
+              - generic [ref=e400]:
+                - generic [ref=e401]: Manually triggered June 15, 2026 12:1423 minutes ago
+                - generic [ref=e402]:
+                  - link "@bybixi bybixi" [ref=e403] [cursor=pointer]:
+                    - /url: /bybixi
+                    - img "@bybixi" [ref=e404]
+                    - text: bybixi
+                  - generic [ref=e405]:
+                    - text: ⁠
+                    - link "463e67c" [ref=e406] [cursor=pointer]:
+                      - /url: /bybixi/ESurfingClient-CVersion/commit/463e67c93287bb667d3bcee10222f85c25c4b30a
+                      - img [ref=e407]
+                      - text: 463e67c
+                  - link "master" [ref=e409] [cursor=pointer]:
+                    - /url: /bybixi/ESurfingClient-CVersion/tree/refs/heads/master
+              - generic [ref=e410]:
+                - generic [ref=e411]: Status
+                - text: Failure
+              - generic [ref=e412]:
+                - generic [ref=e413]: Total duration
+                - link "4m 54s" [ref=e414] [cursor=pointer]:
+                  - /url: /bybixi/ESurfingClient-CVersion/actions/runs/27545464366/usage
+              - generic [ref=e415]:
+                - generic [ref=e416]: Artifacts
+                - text: –
+          - region "Workflow run graph" [ref=e417]:
+            - generic [ref=e419]:
+              - generic [ref=e421]:
+                - heading "build-openwrt-ipk-mediatek_filogic.yml" [level=2] [ref=e422]:
+                  - link "build-openwrt-ipk-mediatek_filogic.yml" [ref=e423] [cursor=pointer]:
+                    - /url: /bybixi/ESurfingClient-CVersion/actions/runs/27545464366/workflow
+                - generic [ref=e424]: "on: workflow_dispatch"
+              - generic [ref=e426]:
+                - generic [ref=e427]:
+                  - img
+                  - img
+                  - 'link "failed: build 4m 47s" [ref=e431] [cursor=pointer]':
+                    - /url: /bybixi/ESurfingClient-CVersion/actions/runs/27545464366/job/81417576606
+                    - generic [ref=e433]:
+                      - img "failed:" [ref=e435]
+                      - generic [ref=e438]: build
+                      - generic [ref=e439]: 4m 47s
+                - generic [ref=e440]:
+                  - paragraph [ref=e441]: Oh hello! Nice to see you.
+                  - paragraph [ref=e442]:
+                    - text: Made with ❤️ by
+                    - link [ref=e443] [cursor=pointer]:
+                      - /url: https://actions.github.io/humans.txt
+                      - text: humans.txt
+              - generic [ref=e444]:
+                - button "Fit to window" [disabled] [ref=e445]:
+                  - img
+                - generic [ref=e446]:
+                  - button "Zoom out" [disabled] [ref=e448]:
+                    - img
+                  - button "Zoom in" [disabled] [ref=e450]:
+                    - img
+          - region "Annotations" [ref=e451]:
+            - generic [ref=e452]:
+              - generic [ref=e454]:
+                - heading "Annotations" [level=2] [ref=e455]
+                - generic [ref=e456]: 1 error
+              - table [ref=e457]:
+                - rowgroup [ref=e458]:
+                  - row "build Process completed with exit code 2." [ref=e459]:
+                    - cell "build Process completed with exit code 2." [ref=e460]:
+                      - generic [ref=e461]:
+                        - img [ref=e463]
+                        - generic [ref=e465]:
+                          - link "build" [ref=e466] [cursor=pointer]:
+                            - /url: /bybixi/ESurfingClient-CVersion/actions/runs/27545464366/job/81417576606#step:13:100
+                            - strong [ref=e467]: build
+                          - generic [ref=e470]: Process completed with exit code 2.

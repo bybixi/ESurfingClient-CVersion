@@ -56,23 +56,29 @@ static bool term()
     uint8_t retry = 1;
     while (result.status != REQUEST_SUCCESS && result.status != REQUEST_HAVE_RES)
     {
+        if (result.body_data) { free(result.body_data); result.body_data = NULL; }
+        if (!g_thread_keep_alive || g_prog_status[tl_thread_idx].runtime_status.is_running == false)
+        {
+            LOG_WARN("收到退出信号, 中止登出重试");
+            free(encrypt);
+            return false;
+        }
         if (retry > 5)
         {
             LOG_FATAL("超过最多重试次数, 返回");
             free(encrypt);
-            if (result.body_data) free(result.body_data);
             return false;
         }
         LOG_ERROR("配置 %" PRIu8 " 登出失败, 下标 %" PRIu8 ", 错误代码: %d, 重试: 第 %" PRIu8 " 次, 最多 5 次", g_prog_status[tl_thread_idx].login_cfg.idx, tl_thread_idx, result.status, retry);
         retry++;
-        sleep_ms(1000, true);
+        sleep_ms(1000);
         result = post(g_prog_status[tl_thread_idx].auth_cfg.term_url, encrypt); // 向 term_url 发送加密数据 (重试)
     }
     free(encrypt);
     if (result.body_data) free(result.body_data);
 
-    g_prog_status[tl_thread_idx].auth_cfg.auth_time = 0;
     g_prog_status[tl_thread_idx].runtime_status.is_authed = false;
+    g_prog_status[tl_thread_idx].auth_cfg.auth_time = 0;
     return true;
 }
 
@@ -380,6 +386,7 @@ static AuthStatus auth()
     if (auth_url == NULL)
     {
         LOG_ERROR("提取 Auth URL 失败");
+        free(portal_config);
         return AUTH_FAILED;
     }
 
@@ -388,6 +395,7 @@ static AuthStatus auth()
     if (cleaned_auth_url == NULL)
     {
         LOG_ERROR("清除 Auth URL 失败");
+        free(portal_config);
         return AUTH_FAILED;
     }
     snprintf(g_prog_status[tl_thread_idx].auth_cfg.auth_url, AUTH_URL_LEN, "%s", safe_str(cleaned_auth_url)); // 将 auth_url 填入认证配置变量中
@@ -472,7 +480,7 @@ static AuthStatus auth()
 
     g_prog_status[tl_thread_idx].runtime_status.is_authed = true;
     LOG_INFO("已认证登录");
-    sleep_ms(5000, false);
+    sleep_ms(5000);
     return AUTH_SUCCESS;
 }
 
@@ -491,6 +499,7 @@ static void clean()
     }
     memset(&g_prog_status[tl_thread_idx].auth_cfg, 0, sizeof(auth_cfg_t)); // 清除 auth_cfg 的内容, 并置零
     memset(&g_prog_status[tl_thread_idx].runtime_status, 0, sizeof(runtime_status_t)); // 清除 runtime_status 的内容, 并置零
+    g_prog_status[tl_thread_idx].last_location_lock = false; // 重置 last_location_lock, 防止重连时使用过期的重定向 URL
 }
 
 static void reset()
@@ -501,9 +510,9 @@ static void reset()
 
 static RunStatus run()
 {
-    static uint8_t retry_timeout = 1;
-    static uint8_t retry_auth = 1;
-    static uint64_t retry_auth_time = 0;
+    static _Thread_local uint8_t retry_timeout = 1;
+    static _Thread_local uint8_t retry_auth = 1;
+    static _Thread_local uint64_t retry_auth_time = 0;
 
     switch (check_network_status()) // 检测网络状态
     {
@@ -538,7 +547,7 @@ static RunStatus run()
                             tl_thread_idx,
                             retry_heartbeat);
                         retry_heartbeat++;
-                        sleep_ms(1000, true);
+                        sleep_ms(1000);
                     }
                     LOG_INFO("下一次重试: %" PRIu64 " 秒后",
                         g_prog_status[tl_thread_idx].auth_cfg.keep_retry);
@@ -550,7 +559,7 @@ static RunStatus run()
         {
             LOG_INFO("已连接至互联网");
         }
-        sleep_ms(1000, false);
+        sleep_ms(1000);
         return RUN_SUCCESS;
     case REQUEST_REDIRECT: // 返回重定向 (302 响应码)
         retry_timeout = 1;
@@ -579,7 +588,7 @@ static RunStatus run()
                 retry_auth_time,
                 retry_auth_time / 1000);
             retry_auth++;
-            sleep_ms(retry_auth_time, true);
+            sleep_ms(retry_auth_time);
         }
         return RUN_SUCCESS;
     case REQUEST_WARN: // 返回警告, 会重试 (错误码 28, 响应超时)
@@ -591,14 +600,14 @@ static RunStatus run()
         }
         LOG_WARN("网络响应超时, 等待 10 秒后重试, 重试: 第 %" PRIu8 " 次, 最多 5 次",
             retry_timeout);
-        sleep_ms(10000, true);
+        sleep_ms(10000);
         retry_timeout++;
         return TIMEOUT_RETRY;
     default:
         retry_timeout = 1;
         retry_auth = 1;
         LOG_ERROR("其它错误");
-        sleep_ms(5000, true);
+        sleep_ms(5000);
         return RUN_FAILED;
     }
 }
@@ -614,6 +623,7 @@ int dialer_app(void* arg)
         g_prog_status[tl_thread_idx].login_cfg.idx);
 
     refresh_states(); // 刷新数据 (algo_id, host_name, client_id, mac_addr)
+    reset_network_state(); // 重置 school_id/domain/area, 防止使用过期的认证参数
     if (get_last_location() == REQUEST_ERROR) g_prog_status[tl_thread_idx].runtime_status.is_running = false;  // 获取 last_location, 用于获取认证配置
 
     /**
@@ -624,17 +634,8 @@ int dialer_app(void* arg)
      */
     while (g_prog_status[tl_thread_idx].runtime_status.is_running)
     {
-        const RunStatus run_status = run();
-        if (run_status == RUN_FAILED || g_prog_status[tl_thread_idx].runtime_status.is_need_reset) // 如果 run 函数返回 RUN_FAILED 或需要重置, 则退出循环
+        if (run() == RUN_FAILED || g_prog_status[tl_thread_idx].runtime_status.is_need_reset) // 如果 run 函数返回 RUN_FAILED 或需要重置, 则退出循环
         {
-            if (run_status == RUN_FAILED)
-            {
-                LOG_ERROR("线程出现错误, 正在退出");
-            }
-            else if (g_prog_status[tl_thread_idx].runtime_status.is_need_reset)
-            {
-                LOG_INFO("线程需要重置, 正在退出");
-            }
             g_prog_status[tl_thread_idx].runtime_status.is_running = false;
             break;
         }
@@ -675,7 +676,7 @@ void work()
      * 非重定向响应都会持续循环
      */
     NetworkStatus status;
-    uint8_t retry_network = 1;
+    uint8_t retry = 1;
     do
     {
         if (g_need_exit)
@@ -687,21 +688,21 @@ void work()
         {
         case REQUEST_SUCCESS:
             LOG_INFO("已连接到互联网");
-            sleep_ms(10000, true);
+            sleep_ms(10000);
             break;
         case REQUEST_ERROR:
         case REQUEST_INIT_ERROR:
-            if (retry_network > 5)
+            if (retry > 5)
             {
                 LOG_FATAL("超过最多重试次数, 退出程序");
                 shut(1);
             }
-            LOG_ERROR("网络错误, 重试: 第 %" PRIu8 " 次, 最多 5 次", retry_network);
-            retry_network++;
-            sleep_ms(5000, true);
+            LOG_ERROR("网络错误, 重试: 第 %" PRIu8 " 次, 最多 5 次", retry);
+            retry++;
+            sleep_ms(5000);
             break;
         default:
-            sleep_ms(1000, true);
+            sleep_ms(1000);
             break;
         }
     } while (status != REQUEST_REDIRECT && status != REQUEST_SUCCESS);
@@ -713,17 +714,17 @@ void work()
     for (uint8_t i = 0; i < g_prog_cnt; i++)
     {
         g_prog_status[i].thread = sim_thread_create(dialer_app, (void*)(intptr_t)i);
-        uint8_t retry_ct = 1;
+        retry = 1;
         while (g_prog_status[i].thread == NULL)
         {
-            if (retry_ct > 5)
+            if (retry > 5)
             {
                 LOG_FATAL("超过重试次数, 退出程序");
                 shut(1);
             }
-            LOG_ERROR("认证线程 %" PRIu8 " 创建失败, 重试中, 重试次数: %" PRIu8 ", 最多 5 次", i, retry_ct);
+            LOG_ERROR("认证线程 %" PRIu8 " 创建失败, 重试中, 重试次数: %" PRIu8 ", 最多 5 次", i, retry);
             g_prog_status[i].thread = sim_thread_create(dialer_app, (void*)(intptr_t)i);
-            retry_ct++;
+            retry++;
         }
     }
 
@@ -731,7 +732,7 @@ void work()
      * 线程守护
      * 登录时间检测
      */
-    sleep_ms(5000, false);
+    sleep_ms(5000);
     LOG_INFO("线程守护开启");
     uint64_t check_time = 0;
     while (g_thread_keep_alive)
@@ -748,25 +749,37 @@ void work()
              */
             if (get_cur_tm_ms() - g_prog_status[i].auth_cfg.auth_time >= 172200000 && g_prog_status[i].auth_cfg.auth_time != 0)
             {
+                // if (g_prog_status[thread_idx].runtime_status.is_settings_changed)
+                // {
+                //     LOG_INFO("设置已更改, 正在重启认证");
+                //     g_prog_status[thread_idx].runtime_status.is_settings_changed = false;
+                // }
                 LOG_DEBUG("当前时间戳: %" PRIu64, get_cur_tm_ms());
                 LOG_WARN("认证时间超过 172200000 毫秒 (1 天 23 时 50 分), 为避免被远程服务器踢下线, 正在重新进行认证");
                 for (uint8_t j = 0; j < g_prog_cnt; j++)
                 {
                     g_prog_status[j].runtime_status.is_need_reset = true;
-                    uint8_t retry_wte = 1;
+                    retry = 1;
                     while (g_prog_status[j].runtime_status.is_authed)
                     {
-                        if (retry_wte > 5)
+                        if (retry > 5)
                         {
-                            LOG_FATAL("超过重试次数, 强制退出线程");
-                            sim_thread_destroy(g_prog_status[j].thread);
+                            LOG_WARN("配置 %" PRIu8 " 登出等待超时, 强制标记退出", g_prog_status[j].login_cfg.idx);
+                            g_prog_status[j].runtime_status.is_running = false;
+                            break;
                         }
-                        LOG_DEBUG("等待配置 %" PRIu8 " 登出, 下标 %" PRIu8 ", 等待次数: %" PRIu8 ", 最多 5 次", g_prog_status[j].login_cfg.idx, j, retry_wte);
-                        retry_wte++;
-                        sleep_ms(2000, true);
+                        LOG_DEBUG("等待配置 %" PRIu8 " 登出, 下标 %" PRIu8 ", 等待次数: %" PRIu8 ", 最多 5 次", g_prog_status[j].login_cfg.idx, j, retry);
+                        retry++;
+                        sleep_ms(2000);
                     }
                 }
             }
+            // else if (g_prog_status[thread_idx].runtime_status.is_settings_changed)
+            // {
+            //     LOG_INFO("设置已更改, 正在重启认证");
+            //     reset();
+            //     g_prog_status[thread_idx].runtime_status.is_settings_changed = false;
+            // }
 
             /**
              * 线程守护
@@ -775,27 +788,28 @@ void work()
             {
                 int result_code = 0;
                 sim_thread_join(g_prog_status[i].thread, &result_code);
+                free(g_prog_status[i].thread); // 释放已结束线程的结构体, 防止内存泄漏
                 LOG_INFO("认证线程 %" PRIu8 " 已结束, 由于线程守护已开启, 将会重新启动此线程", i);
                 g_prog_status[i].thread = sim_thread_create(dialer_app, (void*)(intptr_t)i);
-                uint8_t retry_ct = 1;
+                retry = 1;
                 while (g_prog_status[i].thread == NULL)
                 {
-                    if (retry_ct > 5)
+                    if (retry > 5)
                     {
                         LOG_FATAL("超过重试次数, 退出程序");
                         shut(1);
                     }
-                    LOG_ERROR("认证线程 %" PRIu8 " 创建失败, 重试中, 重试次数: %" PRIu8 ", 最多 5 次", i, retry_ct);
+                    LOG_ERROR("认证线程 %" PRIu8 " 创建失败, 重试中, 重试次数: %" PRIu8 ", 最多 5 次", i, retry);
                     g_prog_status[i].thread = sim_thread_create(dialer_app, (void*)(intptr_t)i);
-                    retry_ct++;
+                    retry++;
                 }
                 while (g_prog_status[i].runtime_status.is_running == false)
                 {
-                    sleep_ms(100, false);
+                    sleep_ms(100);
                 }
             }
         }
-        sleep_ms(10, false);
+        sleep_ms(10);
         check_time += 10;
     }
     LOG_INFO("线程守护已关闭");
@@ -805,6 +819,6 @@ void work()
 #endif
         )
     {
-        sleep_ms(10000, false);
+        sleep_ms(10000);
     }
 }

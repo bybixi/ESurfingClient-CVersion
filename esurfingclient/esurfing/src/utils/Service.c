@@ -7,7 +7,6 @@
 #include <stdint.h>
 #include <stdio.h>
 
-extern bool g_need_restart;
 extern jmp_buf g_exit_jmp;
 
 extern void work();
@@ -66,12 +65,6 @@ void WINAPI ServiceMain(DWORD argc, LPTSTR *argv)
         work();
     }
 
-    if (g_need_restart)
-    {
-        // 不报告 SERVICE_STOPPED，直接以非 0 码退出
-        ExitProcess(1);
-    }
-    // 正常停止：报告 SERVICE_STOPPED
     CloseHandle(g_ServiceStopEvent);
     g_ServiceStatus.dwCurrentState = SERVICE_STOPPED;
     SetServiceStatus(g_StatusHandle, &g_ServiceStatus);

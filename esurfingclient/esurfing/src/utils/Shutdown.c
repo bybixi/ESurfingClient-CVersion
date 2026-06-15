@@ -7,7 +7,6 @@
 #include <stdlib.h>
 
 #ifndef __OPENWRT__
-extern void restart_process();
 extern void stop_web_server();
 #endif
 
@@ -16,10 +15,9 @@ extern void stop_web_server();
 extern bool get_service_mode();
 #endif
 
-void shut(const int8_t exit_code)
+void shut(const uint8_t exit_code)
 {
     LOG_INFO("主程序正在关闭");
-    g_need_exit = true;
 
 #ifndef __OPENWRT__
     if (g_is_webserver_running)
@@ -41,8 +39,12 @@ void shut(const int8_t exit_code)
         int result_code = 0;
         g_prog_status[i].runtime_status.is_running = false;
         sim_thread_join(g_prog_status[i].thread, &result_code);
+        free(g_prog_status[i].thread);
+        g_prog_status[i].thread = NULL;
         LOG_DEBUG("认证线程退出, 退出码: %d", result_code);
     }
+    free(g_prog_status);
+    g_prog_status = NULL;
     LOG_INFO("退出程序, 退出码: %" PRIu8, exit_code);
     clean_logger();
 
@@ -52,11 +54,6 @@ void shut(const int8_t exit_code)
         longjmp(g_exit_jmp, 1);
     }
 #endif
-
-    if (g_need_restart)
-    {
-        restart_process();
-    }
 
     exit(exit_code);
 }

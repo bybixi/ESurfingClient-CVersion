@@ -11,12 +11,15 @@ on:
       version:
         required: true
         type: string
+        default: "2.0.4"
       release:
         required: true
         type: string
+        default: "6"
       sdk_version:
         required: true
         type: string
+        default: "24.10.6"
 
 env:
   SDK_URL: "https://downloads.openwrt.org/releases/25.12.0/targets/qualcommax/ipq60xx"
@@ -33,8 +36,8 @@ jobs:
 
       - name: 更新 Makefile 版本号
         run: |
-          sed -i "s/PKG_VERSION:=.*/PKG_VERSION:=${{ inputs.version }}/" esurfingclient/Makefile
-          sed -i "s/PKG_RELEASE:=.*/PKG_RELEASE:=${{ inputs.release }}/" esurfingclient/Makefile
+          sed -i "s/PKG_VERSION:=.*/PKG_VERSION:=${{ inputs.version || '2.0.4' }}/" esurfingclient/Makefile
+          sed -i "s/PKG_RELEASE:=.*/PKG_RELEASE:=${{ inputs.release || '6' }}/" esurfingclient/Makefile
 
       - name: 安装软件包 (最多重试 3 次)
         run: |
@@ -56,7 +59,7 @@ jobs:
         with:
           path: |
             ${{ env.SDK_NAME }}.tar.zst
-          key: openwrt-qualcommax_ipq60xx-apk-sdk-${{ inputs.sdk_version }}
+          key: openwrt-qualcommax_ipq60xx-apk-sdk-${{ inputs.sdk_version || '24.10.6' }}
 
       - name: 下载 SDK
         if: steps.cache-openwrt-sdk.outputs.cache-hit != 'true'
@@ -79,7 +82,7 @@ jobs:
           path: |
             openwrt-sdk/staging_dir/
             openwrt-sdk/dl/
-          key: openwrt-qualcommax_ipq60xx-sdk-${{ inputs.sdk_version }}-${{ hashFiles('.configs/qualcommax_ipq60xx-apk.config') }}
+          key: openwrt-qualcommax_ipq60xx-sdk-${{ inputs.sdk_version || '24.10.6' }}-${{ hashFiles('.configs/qualcommax_ipq60xx-apk.config') }}
 
       - name: 准备构建配置
         if: steps.cache-openwrt.outputs.cache-hit != 'true'
@@ -116,15 +119,15 @@ jobs:
           
           cd openwrt-sdk
           
-          scripts/feeds install esurfingclient
-          
-          make package/esurfingclient/compile -j$(nproc)
+          make defconfig
 
-          find bin/packages -name "esurfingclient*.apk" -exec cp {} ../esurfingclient_${{ inputs.version }}-${{ inputs.release }}_qualcommax_ipq60xx.apk \;
+          make package/esurfingclient/compile -j$(nproc) V=s
+
+          find bin/packages -name "esurfingclient*.apk" -exec cp {} ../esurfingclient_${{ inputs.version || '2.0.4' }}-${{ inputs.release || '6' }}_qualcommax_ipq60xx.apk \;
 
       - name: 上传工件
         uses: actions/upload-artifact@v7
         with:
-          name: esurfingclient_${{ inputs.version }}-${{ inputs.release }}_qualcommax_ipq60xx-apk
-          path: esurfingclient_${{ inputs.version }}-${{ inputs.release }}_qualcommax_ipq60xx.apk
+          name: esurfingclient_${{ inputs.version || '2.0.4' }}-${{ inputs.release || '6' }}_qualcommax_ipq60xx-apk
+          path: esurfingclient_${{ inputs.version || '2.0.4' }}-${{ inputs.release || '6' }}_qualcommax_ipq60xx.apk
           retention-days: 30
