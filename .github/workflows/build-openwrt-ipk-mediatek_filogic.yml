@@ -137,6 +137,8 @@ jobs:
 
           make defconfig
 
+          make package/esurfingclient/clean V=s
+
           make package/esurfingclient/compile -j$(nproc) V=s
 
           find bin/packages -name "esurfingclient*.ipk" -exec cp {} ../esurfingclient_${{ inputs.version || '2.0.4' }}-${{ inputs.release || '6' }}_mediatek_filogic.ipk \;
