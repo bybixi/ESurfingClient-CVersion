@@ -135,17 +135,20 @@ jobs:
           grep -c CURLOPT_CONNECTTIMEOUT esurfingclient/esurfing/src/NetClient.c || true
           grep -c reset_network_state esurfingclient/esurfing/src/NetClient.c || true
 
-          cp -r esurfingclient openwrt-sdk/package/
-
           cd openwrt-sdk
 
-          # Nuclear clean - remove ALL cached esurfingclient files
+          # Nuclear clean BEFORE copying new source
           rm -rf build_dir/target-*/esurfingclient 2>/dev/null || true
           rm -rf staging_dir/target-*/root-*/usr/bin/esurfingclient 2>/dev/null || true
           rm -rf staging_dir/pkg/esurfingclient 2>/dev/null || true
           rm -rf bin/packages/*/base/esurfingclient* 2>/dev/null || true
           rm -rf bin/targets/*/packages/esurfingclient* 2>/dev/null || true
-          find . -name "esurfingclient*" -type f 2>/dev/null | xargs rm -f 2>/dev/null || true
+
+          cd ..
+
+          cp -r esurfingclient openwrt-sdk/package/
+
+          cd openwrt-sdk
 
           make defconfig
 
