@@ -1,66 +1,71 @@
 # ESurfingClient-C (修复版)
 
-> 本项目 fork 自 [BadGhost520/ESurfingClient-CVersion](https://github.com/BadGhost520/ESurfingClient-CVersion)，在此基础上修复了多个导致路由器断网的关键问题。
+> 本项目 fork 自 [BadGhost520/ESurfingClient-CVersion](https://github.com/BadGhost520/ESurfingClient-CVersion)，修复了导致路由器断网、内存泄漏、磁盘写爆、DNS 崩溃等多个关键问题。
+
+> **最新编译**: [v2.0.4-r6](https://github.com/bybixi/ESurfingClient-CVersion/releases/tag/v2.0.4-r6)
 
 ## 与上游版本的区别
 
-### 断网修复（核心问题）
+### 断网修复（核心）
 
-上游版本在路由器上运行几天后会断网且无法自动恢复。经分析日志和代码，定位到以下根因：
-
-| 问题 | 原因 | 修复 |
+| 问题 | 根因 | 修复 |
 |------|------|------|
-| 进程挂死无日志 | `curl_easy_perform()` 卡在 DNS 解析，无连接超时 | 添加 `CURLOPT_CONNECTTIMEOUT` (5s) + `CURLOPT_NOSIGNAL` |
-| 内存持续增长 | `check_network_status()` / `get_last_location()` / `term()` 的 `body_data` 未释放 | 所有 `get()`/`post()` 返回后 `free(body_data)` |
-| 重连认证失败 | `s_school_id` / `s_domain` / `s_area` 重连后不更新，用过期参数发请求 | 每次重连前调用 `reset_network_state()` 清空 |
-| 重定向 URL 过期 | `last_location_lock` 在线程重启后不重置 | `clean()` 中重置 `last_location_lock = false` |
+| 进程挂死无日志 | `curl_easy_perform()` 卡在 DNS 解析，无连接超时 | `CURLOPT_CONNECTTIMEOUT` (5s) + `CURLOPT_NOSIGNAL` |
+| 内存泄漏 OOM | 5 个函数中 `body_data` 未释放 | 所有 `get()`/`post()` 返回后 `free(body_data)` |
+| 重连认证失败 | `s_school_id`/`s_domain`/`s_area` 用过期值 | 重连前 `reset_network_state()` 清空 |
+| 重定向 URL 过期 | `last_location_lock` 不重置 | `clean()` 中重置 |
+
+### 磁盘/DNS 修复
+
+| 问题 | 根因 | 修复 |
+|------|------|------|
+| `/tmp` 被日志写满 | `log_lv=VERBOSE` 每秒 1 条，2 天写满 117MB | 默认 WARN，256KB 轮转，最多 2 个文件 |
+| DNS 打挂 dnsmasq | 每秒 curl 无 DNS 缓存 | `CURLOPT_DNS_CACHE_TIMEOUT=300s` |
+| 高频 CPU/网络 | 在线每秒 `check_network_status()` | 轮询间隔 1s → 5s |
 
 ### 多线程优雅退出
 
 | 问题 | 修复 |
 |------|------|
-| `run()` 的 `retry_timeout` / `retry_auth` 是 `static` 共享变量，多线程竞争 | 改为 `static _Thread_local` |
-| watchdog 超时后调用 `sim_thread_destroy()` 释放还在运行的线程句柄 | 改为设 `is_running = false` 等待自然退出 |
-| `term()` 重试不检查退出标志，关机时阻塞 5 秒 | 加 `g_thread_keep_alive` + `is_running` 检查 |
-| `get_last_location()` 重定向循环无退出条件 | 加退出信号检查，防止死循环 |
-| `shut()` 不释放线程句柄和 `g_prog_status` | 加 `free(thread)` + `free(g_prog_status)` |
+| `run()` `retry_*` 是 `static` 共享变量 → 数据竞争 | `static _Thread_local` |
+| watchdog `sim_thread_destroy()` 释放运行中的线程 | 设 `is_running=false` 等待自然退出 |
+| `term()` 重试不检查退出标志 | `g_thread_keep_alive` 检查 |
+| `get_last_location()` 重定向死循环 | 退出信号检查 |
+| `shut()` 线程句柄 + 数组泄漏 | `free(thread)` + `free(g_prog_status)` |
+| `clean_logger()` `return` 后死代码 | 清理 |
 
-### CI 构建修复
+### CI 修复
 
 | 问题 | 修复 |
 |------|------|
-| `scripts/feeds install esurfingclient` 失败 | 去掉，本地包不需要 feed install |
-| `workflow_dispatch` 手动触发时 `inputs` 为空，版本号被清空 | 所有 `inputs` 引用加 `\|\| '默认值'` fallback |
-| 缺少详细编译日志 | 加 `V=s` 输出 |
+| `feeds install esurfingclient` 失败 | 本地包不需要 |
+| `workflow_dispatch` `inputs` 为空 | `\|\| '默认值'` fallback |
+| SDK 缓存导致不重编译 | 先 `rm -rf` 缓存再 `cp` 源码 |
 
 ## 安装方法
 
 ### OpenWrt (mediatek_filogic)
 
 ```bash
-# 下载
 wget https://github.com/bybixi/ESurfingClient-CVersion/releases/download/v2.0.4-r6/esurfingclient_2.0.4-6_mediatek_filogic.ipk -O /tmp/esurfingclient.ipk
-
-# 安装（覆盖旧版）
 opkg install /tmp/esurfingclient.ipk --force-reinstall
-
-# 重启服务
 /etc/init.d/esurfingclient restart
+```
+
+### 验证修复
+
+```bash
+# 确认是修复版（应输出 1）
+strings /usr/bin/esurfingclient | grep -c reset_network_state
 ```
 
 ### 其它架构
 
-从 [Releases](https://github.com/bybixi/ESurfingClient-CVersion/releases) 页面下载对应架构的 ipk 包。
+从 [Releases](https://github.com/bybixi/ESurfingClient-CVersion/releases) 下载。
 
 ## 原项目说明
 
-**根据 Rsplwe 大佬的 Kotlin 源码编写的纯 C 版本的天翼校园认证客户端**
-
-使用了 [cJSON](https://github.com/DaveGamble/cJSON), [mongoose](https://github.com/cesanta/mongoose) 开源库
-
-- 程序文件超级小（所有版本均仅占用 2MB 左右的储存空间）
-- 跨平台跨架构能力强
-- 支持 OpenWRT 15.05 到最新版的 LuCI 以及程序软件包
+根据 Rsplwe 大佬的 Kotlin 源码编写的纯 C 版本天翼校园认证客户端。程序文件仅 2MB，跨平台跨架构，支持 OpenWrt / Windows / Linux / macOS。
 
 > 理论上只要是用天翼校园网客户端的学校都可以用，不论省份。
 
