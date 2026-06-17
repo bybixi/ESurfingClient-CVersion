@@ -601,8 +601,6 @@ static RunStatus run()
             retry_timeout = 1;
             sleep_ms(60000, true);
             return TIMEOUT_RETRY;
-            LOG_ERROR("超过最多重试次数");
-            return RUN_FAILED;
         }
         LOG_WARN("网络响应超时, 等待 10 秒后重试, 重试: 第 %" PRIu8 " 次, 最多 5 次",
             retry_timeout);
