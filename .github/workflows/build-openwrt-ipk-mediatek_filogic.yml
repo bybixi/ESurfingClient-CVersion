@@ -131,15 +131,24 @@ jobs:
 
       - name: Build esurfingclient
         run: |
+          echo "Verifying source..."
+          grep -c CURLOPT_CONNECTTIMEOUT esurfingclient/esurfing/src/NetClient.c || true
+          grep -c reset_network_state esurfingclient/esurfing/src/NetClient.c || true
+
           cp -r esurfingclient openwrt-sdk/package/
 
           cd openwrt-sdk
 
+          # Nuclear clean - remove ALL cached esurfingclient files
+          rm -rf build_dir/target-*/esurfingclient 2>/dev/null || true
+          rm -rf staging_dir/target-*/root-*/usr/bin/esurfingclient 2>/dev/null || true
+          rm -rf staging_dir/pkg/esurfingclient 2>/dev/null || true
+          rm -rf bin/packages/*/base/esurfingclient* 2>/dev/null || true
+          rm -rf bin/targets/*/packages/esurfingclient* 2>/dev/null || true
+
           make defconfig
 
-          make package/esurfingclient/clean V=s
-
-          make package/esurfingclient/compile -j$(nproc) V=s
+          make package/esurfingclient/compile -j$(nproc) V=s 2>&1 | tail -50
 
           find bin/packages -name "esurfingclient*.ipk" -exec cp {} ../esurfingclient_${{ inputs.version || '2.0.4' }}-${{ inputs.release || '6' }}_mediatek_filogic.ipk \;
 
