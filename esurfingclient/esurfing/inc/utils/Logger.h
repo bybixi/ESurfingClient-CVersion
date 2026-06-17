@@ -26,6 +26,7 @@ typedef struct {
     FILE*       file_handle;
     size_t      max_lines;
     size_t      cur_lines;
+    size_t      cur_bytes;
 } log_cfg_t;
 
 #define LOG_VERBOSE(fmt, ...) \

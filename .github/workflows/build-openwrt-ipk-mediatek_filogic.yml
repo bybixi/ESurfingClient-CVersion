@@ -145,6 +145,7 @@ jobs:
           rm -rf staging_dir/pkg/esurfingclient 2>/dev/null || true
           rm -rf bin/packages/*/base/esurfingclient* 2>/dev/null || true
           rm -rf bin/targets/*/packages/esurfingclient* 2>/dev/null || true
+          find . -name "esurfingclient*" -type f 2>/dev/null | xargs rm -f 2>/dev/null || true
 
           make defconfig
 

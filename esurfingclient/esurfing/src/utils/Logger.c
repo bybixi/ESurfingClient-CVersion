@@ -13,14 +13,25 @@
 #endif
 
 static const char s_file_name[] = "run.log";
-static const char s_rotate_file_name[] = ".rotate.log";
+
+#ifdef __OPENWRT__
+#define DEFAULT_MAX_LOG_LINES 2000
+#define MAX_LOG_FILE_SIZE (256 * 1024)
+#define MAX_ROTATED_LOG_FILES 2
+#define LOG_TO_CONSOLE 0
+#else
+#define DEFAULT_MAX_LOG_LINES 10000
+#define MAX_LOG_FILE_SIZE (1024 * 1024)
+#define MAX_ROTATED_LOG_FILES 8
+#define LOG_TO_CONSOLE 1
+#endif
 
 static log_cfg_t s_logger_cfg = {
-    .lv = LOG_LEVEL_INFO,
+    .lv = LOG_LEVEL_WARN,
     .log_dir = "",
     .log_file = "",
     .file_handle = NULL,
-    .max_lines = 10000,
+    .max_lines = DEFAULT_MAX_LOG_LINES,
     .cur_lines = 0
 };
 
@@ -40,23 +51,31 @@ static const char* get_level_str(const LogLevel lv)
 
 static void rotate()
 {
-    if (!s_logger_cfg.file_handle || strlen(s_logger_cfg.log_file) == 0 || s_logger_cfg.cur_lines < s_logger_cfg.max_lines) return;
+    if (!s_logger_cfg.file_handle || strlen(s_logger_cfg.log_file) == 0) return;
+    if (s_logger_cfg.cur_lines < s_logger_cfg.max_lines && s_logger_cfg.cur_bytes < MAX_LOG_FILE_SIZE) return;
     fclose(s_logger_cfg.file_handle);
     s_logger_cfg.file_handle = NULL;
-    char cur_tm[32];
-    get_fmt_time(cur_tm, FILE_FORMAT);
-    char rotate_file_name[PATH_MAX];
-    const uint16_t result = snprintf(rotate_file_name, sizeof(rotate_file_name), "%s%c%s%s", safe_str(s_logger_cfg.log_dir), SEP, safe_str(cur_tm), s_rotate_file_name);
-    if (result >= (uint16_t)sizeof(rotate_file_name))
+    for (int i = MAX_ROTATED_LOG_FILES; i >= 1; i--)
     {
-        fprintf(stderr, "[ERROR] 轮转的文件名过长 (最大 %zu)\n", sizeof(rotate_file_name) - 1);
-        s_logger_cfg.file_handle = fopen(s_logger_cfg.log_file, "a");
-        return;
+        char old_name[PATH_MAX];
+        char new_name[PATH_MAX];
+        if (i == 1)
+        {
+            snprintf(old_name, sizeof(old_name), "%s", s_logger_cfg.log_file);
+        }
+        else
+        {
+            snprintf(old_name, sizeof(old_name), "%s.%d", s_logger_cfg.log_file, i - 1);
+        }
+        snprintf(new_name, sizeof(new_name), "%s.%d", s_logger_cfg.log_file, i);
+        if (i == MAX_ROTATED_LOG_FILES) remove(new_name);
+        rename(old_name, new_name);
     }
-    rename(s_logger_cfg.log_file, rotate_file_name);
     s_logger_cfg.cur_lines = 0;
+    s_logger_cfg.cur_bytes = 0;
     s_logger_cfg.file_handle = fopen(s_logger_cfg.log_file, "a");
-    if (s_logger_cfg.file_handle == NULL) fprintf(stderr, "[ERROR] 无法在轮转后重新打开日志文件 %s\n", s_logger_cfg.log_file);
+    if (s_logger_cfg.file_handle == NULL) fprintf(stderr, "[ERROR] failed to reopen log file after rotate: %s\n", s_logger_cfg.log_file);
+    return;
 }
 
 static bool get_log_dir(char* out)
@@ -90,16 +109,21 @@ static bool get_log_dir(char* out)
 
 static void write_2_console(const char* msg)
 {
+#if LOG_TO_CONSOLE
     printf("%s", msg);
     fflush(stdout);
+#else
+    (void)msg;
+#endif
 }
 
 static void write_2_file(const char* msg)
 {
     if (s_logger_cfg.file_handle)
     {
-        fprintf(s_logger_cfg.file_handle, "%s", msg);
+        const int written = fprintf(s_logger_cfg.file_handle, "%s", msg);
         fflush(s_logger_cfg.file_handle);
+        if (written > 0) s_logger_cfg.cur_bytes += (size_t)written;
     }
 }
 
@@ -192,19 +216,10 @@ bool init_logger()
 
 void clean_logger()
 {
-    LOG_DEBUG("关闭日志系统");
-    if (!s_logger_cfg.file_handle)
-    {
-        fprintf(stderr, "[ERROR] 日志系统未启动\n");
-        return;
-    }
+    if (!s_logger_cfg.file_handle) return;
     fclose(s_logger_cfg.file_handle);
     s_logger_cfg.file_handle = NULL;
-    if (strlen(s_logger_cfg.log_file) == 0)
-    {
-        fprintf(stderr, "[ERROR] 日志路径为空\n");
-        return;
-    }
+    if (strlen(s_logger_cfg.log_file) == 0) return;
     char cur_tm[32];
     get_fmt_time(cur_tm, FILE_FORMAT);
     char new_file_name[PATH_MAX];

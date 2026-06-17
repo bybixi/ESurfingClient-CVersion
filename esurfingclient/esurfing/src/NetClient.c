@@ -20,6 +20,7 @@
 #endif
 
 #define MAX_LEN 128
+#define MAX_HTTP_BODY_SIZE (256 * 1024)
 
 #define SCHOOL_ID_LENGTH 8
 #define DOMAIN_LENGTH 16
@@ -28,8 +29,6 @@
 static const char s_req_content_type[] = "Content-Type: application/x-www-form-urlencoded";
 static const char s_req_accept[] = "Accept: text/html,text/xml,application/xhtml+xml,application/x-javascript,*/*";
 static const char s_generate_url[] = "http://connect.rom.miui.com/generate_204";
-static const char s_backup_generate_url[] = "http://192.0.2.1";
-
 static char s_school_id[SCHOOL_ID_LENGTH];
 static char s_domain[DOMAIN_LENGTH];
 static char s_area[AREA_LENGTH];
@@ -116,7 +115,7 @@ static size_t header_cb(const void* contents, const size_t size, const size_t nm
     {
         if (s_school_id[0] == '\0')
         {
-            LOG_VERBOSE("原始数据: %s", header);
+            LOG_VERBOSE("原始数据: %.*s", (int)real_size, header);
 
             const char* value = header + 9;
             while (*value == ' ') value++;
@@ -140,7 +139,7 @@ static size_t header_cb(const void* contents, const size_t size, const size_t nm
     {
         if (s_domain[0] == '\0')
         {
-            LOG_VERBOSE("原始数据: %s", header);
+            LOG_VERBOSE("原始数据: %.*s", (int)real_size, header);
 
             const char* value = header + 7;
             while (*value == ' ') value++;
@@ -164,7 +163,7 @@ static size_t header_cb(const void* contents, const size_t size, const size_t nm
     {
         if (s_area[0] == '\0')
         {
-            LOG_VERBOSE("原始数据: %s", header);
+            LOG_VERBOSE("原始数据: %.*s", (int)real_size, header);
 
             const char* value = header + 5;
             while (*value == ' ') value++;
@@ -190,7 +189,7 @@ static size_t header_cb(const void* contents, const size_t size, const size_t nm
         {
             if (!g_prog_status[tl_thread_idx].last_location_lock)
             {
-                LOG_VERBOSE("原始数据: %s", header);
+                LOG_VERBOSE("原始数据: %.*s", (int)real_size, header);
 
                 const char* value = header + 9;
                 while (*value == ' ') value++;
@@ -219,6 +218,11 @@ static size_t write_cb(const void* contents, const size_t size, const size_t nme
 {
     http_resp_t* resp = userdata;
     const size_t real_size = size * nmemb;
+    if (real_size > MAX_HTTP_BODY_SIZE || resp->body_size > MAX_HTTP_BODY_SIZE - real_size)
+    {
+        LOG_WARN("HTTP 响应体超过上限 %d 字节, 中止读取", MAX_HTTP_BODY_SIZE);
+        return 0;
+    }
     char* ptr = realloc(resp->body_data, resp->body_size + real_size + 1);
 
     if (!ptr) return 0;
@@ -385,6 +389,7 @@ http_resp_t post(const char* url, const char* data)
     curl_easy_setopt(curl, CURLOPT_TIMEOUT, 10L);
     curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 5L);
     curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
+    curl_easy_setopt(curl, CURLOPT_DNS_CACHE_TIMEOUT, 300L);
 
 #ifdef __OPENWRT__
     curl_easy_setopt(curl, CURLOPT_OPENSOCKETFUNCTION, open_socket_callback);
@@ -473,6 +478,7 @@ http_resp_t get(const char* url)
     curl_easy_setopt(curl, CURLOPT_TIMEOUT, 10L);
     curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 5L);
     curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
+    curl_easy_setopt(curl, CURLOPT_DNS_CACHE_TIMEOUT, 300L);
     curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 0L);
     if (tl_thread_idx != -1)
     {
@@ -534,13 +540,9 @@ NetworkStatus check_network_status()
     http_resp_t resp = get(s_generate_url);
     if (resp.curl_code == CURLE_COULDNT_RESOLVE_HOST)
     {
-        LOG_WARN("DNS 解析错误, 使用备用超时方案重试");
-        if (resp.body_data) { free(resp.body_data); resp.body_data = NULL; }
-        resp = get(s_backup_generate_url);
-        if (resp.status == REQUEST_WARN)
-        {
-            resp.status = REQUEST_SUCCESS;
-        }
+        LOG_WARN("DNS 解析错误, 不再将超时兜底伪装为联网成功");
+        if (resp.body_data) free(resp.body_data);
+        return REQUEST_WARN;
     }
     const NetworkStatus status = resp.status;
     if (resp.body_data) free(resp.body_data);
@@ -593,13 +595,9 @@ NetworkStatus get_last_location()
         resp = get(s_generate_url); // 检测响应码
         if (resp.curl_code == CURLE_COULDNT_RESOLVE_HOST)
         {
-            LOG_WARN("DNS 解析错误, 使用备用超时方案重试");
+            LOG_WARN("DNS 解析错误, 等待 DNS 恢复后重试");
             if (resp.body_data) { free(resp.body_data); resp.body_data = NULL; resp.body_size = 0; }
-            resp = get(s_backup_generate_url);
-            if (resp.status == REQUEST_WARN)
-            {
-                resp.status = REQUEST_SUCCESS;
-            }
+            resp.status = REQUEST_WARN;
         }
         switch (resp.status)
         {

@@ -596,7 +596,8 @@ bool load_cfg()
     }
     else
     {
-        LOG_WARN("log_lv 参数不存在, 使用默认等级 (INFO)");
+        set_logger_level(LOG_LEVEL_WARN);
+        LOG_WARN("log_lv 参数不存在, 使用默认等级 (WARN)");
     }
 
     const cJSON* enabled = cJSON_GetObjectItem(cfg_json, "enabled");

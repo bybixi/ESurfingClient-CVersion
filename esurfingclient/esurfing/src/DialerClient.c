@@ -371,6 +371,7 @@ static AuthStatus auth()
     if (resp.status != REQUEST_HAVE_RES || resp.body_size == 0 || resp.body_data == NULL) // 如果响应体没有内容 (非 200 响应码), 则返回
     {
         LOG_ERROR("响应体为空, 无法提取认证配置");
+        if (resp.body_data) free(resp.body_data);
         return AUTH_FAILED;
     }
 
@@ -424,6 +425,7 @@ static AuthStatus auth()
     if (client_ip == NULL)
     {
         LOG_ERROR("提取 Client IP 失败");
+        free(cleaned_ticket_url);
         return AUTH_FAILED;
     }
     snprintf(g_prog_status[tl_thread_idx].auth_cfg.client_ip, IP_LEN, "%s", safe_str(client_ip)); // 将 client_ip 填入认证配置变量中
@@ -559,7 +561,7 @@ static RunStatus run()
         {
             LOG_INFO("已连接至互联网");
         }
-        sleep_ms(1000, true);
+        sleep_ms(5000, true);
         return RUN_SUCCESS;
     case REQUEST_REDIRECT: // 返回重定向 (302 响应码)
         retry_timeout = 1;
@@ -595,6 +597,10 @@ static RunStatus run()
         retry_auth = 1;
         if (retry_timeout > 5)
         {
+            LOG_WARN("网络持续超时或 DNS 异常, 等待 60 秒后继续低频重试");
+            retry_timeout = 1;
+            sleep_ms(60000, true);
+            return TIMEOUT_RETRY;
             LOG_ERROR("超过最多重试次数");
             return RUN_FAILED;
         }
@@ -700,6 +706,10 @@ void work()
             LOG_ERROR("网络错误, 重试: 第 %" PRIu8 " 次, 最多 5 次", retry);
             retry++;
             sleep_ms(5000, true);
+            break;
+        case REQUEST_WARN:
+            LOG_WARN("网络检测超时或 DNS 异常, 等待 30 秒后重试");
+            sleep_ms(30000, true);
             break;
         default:
             sleep_ms(1000, true);
