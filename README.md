@@ -92,9 +92,9 @@ strings /usr/bin/esurfingclient | grep -c reset_network_state
 
 本项目修复由 AI 辅助完成：
 
-- **DeepSeek** — 代码分析与修复方案设计
-- **ChatGPT (Claude)** — 代码编写、编译调试、CI 工作流修复
-- **MiMo** — 代码审查
+- **DeepSeek** / **MiMo** — 代码编写
+- **ChatGPT** — 代码审查
+- **Claude Code** / **Codex** 插件 — 代码编写与集成
 
 所有 AI 产出均已人工审查确认后合并。
 
