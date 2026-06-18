@@ -2,7 +2,7 @@
 
 > 本项目 fork 自 [BadGhost520/ESurfingClient-CVersion](https://github.com/BadGhost520/ESurfingClient-CVersion)，修复了导致路由器断网、内存泄漏、磁盘写爆、DNS 崩溃等多个关键问题。
 
-> **最新编译**: [v2.0.4-r6](https://github.com/bybixi/ESurfingClient-CVersion/releases/tag/v2.0.4-r6)
+> **最新编译**: [v2.0.4-r7](https://github.com/bybixi/ESurfingClient-CVersion/releases/tag/v2.0.4-r7)
 
 ## 与上游版本的区别
 
@@ -22,6 +22,8 @@
 | `/tmp` 被日志写满 | `log_lv=VERBOSE` 每秒 1 条，2 天写满 117MB | 默认 WARN，256KB 轮转，最多 2 个文件 |
 | DNS 打挂 dnsmasq | 每秒 curl 无 DNS 缓存 | `CURLOPT_DNS_CACHE_TIMEOUT=300s` |
 | 高频 CPU/网络 | 在线每秒 `check_network_status()` | 轮询间隔 1s → 5s |
+| procd 日志刷屏 (r7) | `stdout 1/stderr 1` 所有日志重复输出到系统日志 | 改为 `stdout 0/stderr 0` |
+| 配置文件默认 VERBOSE (r7) | 多处 `log_lv` 默认值不一致 (4/5/6) | 统一为 3 (WARN)：config.json、LuCI、代码 |
 
 ### 多线程优雅退出
 
@@ -32,6 +34,7 @@
 | `term()` 重试不检查退出标志 | `g_thread_keep_alive` 检查 |
 | `get_last_location()` 重定向死循环 | 退出信号检查 |
 | `shut()` 线程句柄 + 数组泄漏 | `free(thread)` + `free(g_prog_status)` |
+| `clean_logger()` `return` 后死代码 (r7) | 关闭 handle 后有无法执行的 rename 逻辑 | 清理 |
 | `clean_logger()` `return` 后死代码 | 清理 |
 
 ### CI 修复
@@ -47,7 +50,7 @@
 ### OpenWrt (mediatek_filogic)
 
 ```bash
-wget https://github.com/bybixi/ESurfingClient-CVersion/releases/download/v2.0.4-r6/esurfingclient_2.0.4-6_mediatek_filogic.ipk -O /tmp/esurfingclient.ipk
+wget https://github.com/bybixi/ESurfingClient-CVersion/releases/download/v2.0.4-r7/esurfingclient_2.0.4-7_mediatek_filogic.ipk -O /tmp/esurfingclient.ipk
 opkg install /tmp/esurfingclient.ipk --force-reinstall
 /etc/init.d/esurfingclient restart
 ```
