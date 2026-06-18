@@ -534,7 +534,7 @@ return view.extend({
                     self.showNotification('重置配置中', 'info');
                     self.config = {
                         enabled: false,
-                        log_lv: 4,
+                        log_lv: 3,
                         accounts: [
                             {
                                 username: '',

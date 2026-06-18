@@ -34,7 +34,7 @@ typedef struct
 
 static const char s_default_cfg[] = "{\n"
                                     "   \"enabled\": false,\n"
-                                    "   \"log_lv\": 4,\n"
+                                    "   \"log_lv\": 3,\n"
                                     "   \"accounts\": [\n"
                                     "       {\n"
                                     "           \"username\": \"\",\n"

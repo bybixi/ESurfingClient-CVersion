@@ -63,7 +63,7 @@ if luci.http.getenv("REQUEST_METHOD") == "POST" then
     return
 end
 
-local config_json = '{"enabled":false,"log_lv":4,"accounts":[{"username":"","password":"","channel":"phone","mark":""}]}'
+local config_json = '{"enabled":false,"log_lv":3,"accounts":[{"username":"","password":"","channel":"phone","mark":""}]}'
 local file = io.open("/etc/config/esurfingclient", "r")
 if file then
     local content = file:read("*a")
@@ -424,7 +424,7 @@ end
         showNotification('重置配置中', 'info');
         config = {
             enabled: false,
-            log_lv: 4,
+            log_lv: 3,
             accounts: [{
                 username: '',
                 password: '',

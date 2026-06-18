@@ -1,6 +1,6 @@
 {
   "enabled": false,
-  "log_lv": 4,
+  "log_lv": 3,
   "accounts": [
     {
       "username": "",

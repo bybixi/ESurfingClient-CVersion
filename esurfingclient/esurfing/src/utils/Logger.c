@@ -219,10 +219,4 @@ void clean_logger()
     if (!s_logger_cfg.file_handle) return;
     fclose(s_logger_cfg.file_handle);
     s_logger_cfg.file_handle = NULL;
-    if (strlen(s_logger_cfg.log_file) == 0) return;
-    char cur_tm[32];
-    get_fmt_time(cur_tm, FILE_FORMAT);
-    char new_file_name[PATH_MAX];
-    snprintf(new_file_name, sizeof(new_file_name), "%s%c%s.log", safe_str(s_logger_cfg.log_dir), SEP, safe_str(cur_tm));
-    rename(s_logger_cfg.log_file, new_file_name);
 }
