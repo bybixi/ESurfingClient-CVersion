@@ -88,6 +88,16 @@ strings /usr/bin/esurfingclient | grep -c reset_network_state
 - [OpenWRT 进阶 - 多播](OpenWRT_mwan3.md)
 - [自行编译指南](Compile.md)
 
+## AI 辅助声明
+
+本项目修复由 AI 辅助完成：
+
+- **DeepSeek** — 代码分析与修复方案设计
+- **ChatGPT (Claude)** — 代码编写、编译调试、CI 工作流修复
+- **MiMo** — 代码审查
+
+所有 AI 产出均已人工审查确认后合并。
+
 ## 致谢
 
 原作者 [BadGhost520](https://github.com/BadGhost520) 及所有贡献者
