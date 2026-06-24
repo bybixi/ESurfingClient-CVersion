@@ -34,8 +34,7 @@
 | `term()` 重试不检查退出标志 | `g_thread_keep_alive` 检查 |
 | `get_last_location()` 重定向死循环 | 退出信号检查 |
 | `shut()` 线程句柄 + 数组泄漏 | `free(thread)` + `free(g_prog_status)` |
-| `clean_logger()` `return` 后死代码 (r7) | 关闭 handle 后有无法执行的 rename 逻辑 | 清理 |
-| `clean_logger()` `return` 后死代码 | 清理 |
+| `clean_logger()` `return` 后死代码 (r7) | 关闭 handle 后清理无法执行的 rename 逻辑 |
 
 ### CI 修复
 
