@@ -4,7 +4,7 @@
 
 > **最新编译**: [v2.0.4-r7](https://github.com/bybixi/ESurfingClient-CVersion/releases/tag/v2.0.4-r7)
 
-## 路由器实际运行情况
+## 本人路由器7天负载下实际运行情况
 
 <img width="2560" height="1271" alt="image" src="https://github.com/user-attachments/assets/e54ad461-f731-48c4-9878-bdb98a41f679" />
 
