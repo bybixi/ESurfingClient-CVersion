@@ -123,7 +123,11 @@ static char* ab6c8_decrypt(cipher_interface_t* self, const char* hex)
     if (!ctx) return NULL;
     size_t ct_len = 0;
     uint8_t* ct = hex_2_bytes(hex, &ct_len);
-    if (!ct) return NULL;
+    if (!ct || ct_len % 8 != 0)
+    {
+        s_free(ct);
+        return NULL;
+    }
     uint8_t* out = s_malloc(ct_len);
     memcpy(out, ct, ct_len);
     uint32_t prev0 = ctx->iv[0];

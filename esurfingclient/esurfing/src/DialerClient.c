@@ -8,6 +8,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 
 #ifndef __OPENWRT__
 extern bool start_web_server();
@@ -279,9 +280,19 @@ static bool load_cipher(const bytes_t zsm)
     }
 
     /**
-     * 提取 zsm 数据到 str 栈中
+     * 提取 zsm 数据到独立缓冲区中
      */
-    char str[zsm.length + 1];
+    if (zsm.length == SIZE_MAX)
+    {
+        LOG_ERROR("zsm 数据过长");
+        return false;
+    }
+    char* str = malloc(zsm.length + 1);
+    if (!str)
+    {
+        LOG_ERROR("分配 zsm 缓冲区失败");
+        return false;
+    }
     memcpy(str, zsm.data, zsm.length);
     str[zsm.length] = '\0';
 
@@ -291,6 +302,7 @@ static bool load_cipher(const bytes_t zsm)
     if (length < 4 + 38) // 判断长度, 不足指定长度返回 false
     {
         LOG_ERROR("字符串长度不足");
+        free(str);
         return false;
     }
 
@@ -300,6 +312,7 @@ static bool load_cipher(const bytes_t zsm)
     char algo_id[ALGO_ID_LEN];
     memcpy(algo_id, str + length - 37, ALGO_ID_LEN - 1);
     algo_id[ALGO_ID_LEN - 1] = '\0';
+    free(str);
     LOG_INFO("Algo ID: %s", algo_id);
 
     /**
@@ -500,7 +513,10 @@ static void clean()
         clean_session(); // 清理会话
     }
     memset(&g_prog_status[tl_thread_idx].auth_cfg, 0, sizeof(auth_cfg_t)); // 清除 auth_cfg 的内容, 并置零
-    memset(&g_prog_status[tl_thread_idx].runtime_status, 0, sizeof(runtime_status_t)); // 清除 runtime_status 的内容, 并置零
+    atomic_store(&g_prog_status[tl_thread_idx].runtime_status.is_initialized, false);
+    atomic_store(&g_prog_status[tl_thread_idx].runtime_status.is_running, false);
+    atomic_store(&g_prog_status[tl_thread_idx].runtime_status.is_authed, false);
+    atomic_store(&g_prog_status[tl_thread_idx].runtime_status.is_need_reset, false);
     g_prog_status[tl_thread_idx].last_location_lock = false; // 重置 last_location_lock, 防止重连时使用过期的重定向 URL
 }
 
@@ -583,7 +599,7 @@ static RunStatus run()
                 return RUN_FAILED;
             }
             retry_auth_time = 60000 * table[retry_auth - 1];
-            LOG_ERROR("配置 %" PRIu8 " 认证失败, 下标 %" PRIu8 ", 重试: 第 %" PRIu8 " 次, 最多 5 次, 下一次重试时间: %" PRIu64 " 毫秒 (% " PRIu64 " 秒) 后",
+            LOG_ERROR("配置 %" PRIu8 " 认证失败, 下标 %" PRIu8 ", 重试: 第 %" PRIu8 " 次, 最多 5 次, 下一次重试时间: %" PRIu64 " 毫秒 (%" PRIu64 " 秒后)",
                 g_prog_status[tl_thread_idx].login_cfg.idx,
                 tl_thread_idx,
                 retry_auth,
@@ -657,10 +673,30 @@ void work()
     g_thread_keep_alive = true;
 
     g_prog_status = calloc(1, sizeof(prog_status_t)); // 初始化 g_prog_status 指针并分配 1 个空间
+    if (!g_prog_status)
+    {
+        fprintf(stderr, "[ERROR] 无法分配程序状态内存\n");
+        return;
+    }
+    atomic_init(&g_prog_status[0].runtime_status.is_initialized, false);
+    atomic_init(&g_prog_status[0].runtime_status.is_running, false);
+    atomic_init(&g_prog_status[0].runtime_status.is_authed, false);
+    atomic_init(&g_prog_status[0].runtime_status.is_need_reset, false);
 
     init_shutdown_hook(); // 初始化关闭钩子
 
-    if (init_logger() == false) return; // 初始化日志系统
+    if (init_logger() == false)
+    {
+        free(g_prog_status);
+        g_prog_status = NULL;
+        g_thread_keep_alive = false;
+        return;
+    }
+    if (init_net_client() == false)
+    {
+        LOG_FATAL("网络库初始化失败");
+        shut(1);
+    }
 
     LOG_INFO("-------------------------------------------------------------------");
     LOG_INFO(" - 程序版本: " PROGRAM_FULL_VERSION);
@@ -669,21 +705,21 @@ void work()
     LOG_INFO(" - 制作不易, 赞助鬼鬼, 让鬼鬼更好地去维护更新这个项目罢~");
     LOG_INFO("-------------------------------------------------------------------");
 
+    if (load_cfg() == false) shut(is_shutdown_requested() ? 0 : 1); // 加载配置文件
+
 #ifndef __OPENWRT__
     if (start_web_server() == false) shut(1); // 启动 Web 服务器线程
 #endif
-
-    if (load_cfg() == false) shut(1); // 加载配置文件
 
     /**
      * 检测网络状态
      * 非重定向响应都会持续循环
      */
-    NetworkStatus status;
+    NetworkStatus status = REQUEST_INIT_ERROR;
     uint8_t retry = 1;
     do
     {
-        if (g_need_exit)
+        if (g_need_exit || is_shutdown_requested())
         {
             break;
         }
@@ -715,6 +751,8 @@ void work()
         }
     } while (status != REQUEST_REDIRECT && status != REQUEST_SUCCESS);
 
+    if (g_need_exit || is_shutdown_requested()) shut(0);
+
     /**
      * 根据配置数创建相应数量的线程
      */
@@ -743,7 +781,7 @@ void work()
     sleep_ms(5000, true);
     LOG_INFO("线程守护开启");
     uint64_t check_time = 0;
-    while (g_thread_keep_alive)
+    while (g_thread_keep_alive && !is_shutdown_requested())
     {
         if (check_time > 299999)
         {
@@ -821,12 +859,5 @@ void work()
         check_time += 10;
     }
     LOG_INFO("线程守护已关闭");
-    while (g_thread_keep_alive == false
-#ifdef _WIN32
-        && get_service_mode() == false
-#endif
-        )
-    {
-        sleep_ms(10000, true);
-    }
+    shut(0);
 }

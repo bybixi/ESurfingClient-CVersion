@@ -229,7 +229,7 @@ jobs:
       - openwrt-mediatek_filogic-apk
       - openwrt-qualcommax_ipq60xx-apk
     runs-on: ubuntu-latest
-    if: always() && !cancelled()
+    if: ${{ always() && !cancelled() && !contains(needs.*.result, 'failure') }}
     steps:
       - uses: actions/checkout@v6
 
@@ -267,7 +267,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release delete master-latest -y --cleanup-tag
+          gh release delete master-latest -y --cleanup-tag || true
 
       - name: 创建 GitHub Prerelease
         uses: softprops/action-gh-release@v3

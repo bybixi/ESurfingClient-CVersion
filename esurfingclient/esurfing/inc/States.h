@@ -5,6 +5,7 @@
 #include "utils/SimThread.h"
 
 #include <setjmp.h>
+#include <stdatomic.h>
 #include <stdint.h>
 
 #define SCHOOL_NETWORK_SYMBOL 8
@@ -89,13 +90,13 @@ typedef struct
 typedef struct
 {
     /** @brief 初始化状态 */
-    bool is_initialized;
+    atomic_bool is_initialized;
     /** @brief 运行状态 */
-    bool is_running;
+    atomic_bool is_running;
     /** @brief 认证状态 */
-    bool is_authed;
+    atomic_bool is_authed;
     /** @brief 需要重置 */
-    bool is_need_reset;
+    atomic_bool is_need_reset;
 } runtime_status_t;
 
 /** @brief 认证线程状态 */
@@ -135,19 +136,19 @@ extern _Thread_local int8_t tl_thread_idx;
 extern prog_status_t* g_prog_status;
 
 /** @brief 校园网标志 */
-extern char g_school_network_symbol[SCHOOL_NETWORK_SYMBOL];
+extern _Thread_local char g_school_network_symbol[SCHOOL_NETWORK_SYMBOL];
 
 /** @brief 线程保活 */
-extern bool g_thread_keep_alive;
+extern atomic_bool g_thread_keep_alive;
 
 /** @brief Web 服务器运行状态 */
-extern bool g_is_webserver_running;
+extern atomic_bool g_is_webserver_running;
 
 /** @brief 需要退出 */
-extern bool g_need_exit;
+extern atomic_bool g_need_exit;
 
 /** @brief 程序启用状态 */
-extern bool g_prog_enabled;
+extern atomic_bool g_prog_enabled;
 
 /** @brief 需要重启 */
 extern bool g_need_restart;

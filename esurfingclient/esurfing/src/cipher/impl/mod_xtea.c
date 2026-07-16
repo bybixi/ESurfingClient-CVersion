@@ -83,7 +83,11 @@ static char* mod_xtea_decrypt(cipher_interface_t* self, const char* hex)
     if (!data) return NULL;
     size_t bytes_len;
     uint8_t* bytes = hex_2_bytes(hex, &bytes_len);
-    if (!bytes) return NULL;
+    if (!bytes || bytes_len % 8 != 0)
+    {
+        s_free(bytes);
+        return NULL;
+    }
     uint8_t* output = s_malloc(bytes_len);
     memcpy(output, bytes, bytes_len);
     s_free(bytes);

@@ -10,9 +10,20 @@
 
 #ifdef _WIN32
 #include <windows.h>
+#define LOGGER_LOCK_INIT SRWLOCK_INIT
+typedef SRWLOCK logger_lock_t;
+static void logger_lock(logger_lock_t* lock) { AcquireSRWLockExclusive(lock); }
+static void logger_unlock(logger_lock_t* lock) { ReleaseSRWLockExclusive(lock); }
+#else
+#include <pthread.h>
+#define LOGGER_LOCK_INIT PTHREAD_MUTEX_INITIALIZER
+typedef pthread_mutex_t logger_lock_t;
+static void logger_lock(logger_lock_t* lock) { pthread_mutex_lock(lock); }
+static void logger_unlock(logger_lock_t* lock) { pthread_mutex_unlock(lock); }
 #endif
 
 static const char s_file_name[] = "run.log";
+static logger_lock_t s_logger_lock = LOGGER_LOCK_INIT;
 
 #ifdef __OPENWRT__
 #define DEFAULT_MAX_LOG_LINES 2000
@@ -83,8 +94,8 @@ static bool get_log_dir(char* out)
 #ifdef _WIN32
     char dir[PATH_MAX];
     if (get_exec_dir(dir) == false) return false;
-    const uint16_t len = snprintf(out, PATH_MAX, "%s%clogs", safe_str(dir), SEP);
-    if ((size_t)len >= PATH_MAX) return false;
+    const int len = snprintf(out, PATH_MAX, "%s%clogs", safe_str(dir), SEP);
+    if (len < 0 || (size_t)len >= PATH_MAX) return false;
     if (!CreateDirectoryA(out, NULL))
     {
         const DWORD err = GetLastError();
@@ -92,8 +103,8 @@ static bool get_log_dir(char* out)
     }
 #else
     const char dir[] = "/var/log/esurfing";
-    const uint16_t len = snprintf(out, PATH_MAX, "%s%clogs", dir, SEP);
-    if ((size_t)len >= PATH_MAX) return false;
+    const int len = snprintf(out, PATH_MAX, "%s%clogs", dir, SEP);
+    if (len < 0 || (size_t)len >= PATH_MAX) return false;
     struct stat st;
     if (stat(out, &st) != 0)
     {
@@ -127,16 +138,12 @@ static void write_2_file(const char* msg)
     }
 }
 
-static char* get_thread_str()
+static const char* get_thread_str(char* buf, const size_t buf_size)
 {
-    for (uint8_t i = 0; i < g_prog_cnt; i++)
+    if (tl_thread_idx >= 0)
     {
-        if (sim_thread_cur_id() == g_prog_status[i].thread_id)
-        {
-            static char str[4];
-            snprintf(str, sizeof(str), "%" PRIu8, i);
-            return str;
-        }
+        snprintf(buf, buf_size, "%" PRId8, tl_thread_idx);
+        return buf;
     }
     if (tl_thread_idx == -1)
     {
@@ -147,25 +154,32 @@ static char* get_thread_str()
 
 void log_out(const LogLevel level, const char* file, const uint32_t line, const char* fmt, ...)
 {
-    if (level > s_logger_cfg.lv) return;
+    logger_lock(&s_logger_lock);
+    if (level > s_logger_cfg.lv)
+    {
+        logger_unlock(&s_logger_lock);
+        return;
+    }
     if (!s_logger_cfg.file_handle)
     {
         fprintf(stderr, "[ERROR] 日志系统未打开, 无法输出日志\n");
+        logger_unlock(&s_logger_lock);
         return;
     }
     va_list local_args;
-    char ts[32];
+    char ts[32] = {0};
     char msg[2048];
     char final_msg[2560];
+    char thread_str[16];
     get_fmt_time(ts, CONSOLE_FORMAT);
     va_start(local_args, fmt);
     vsnprintf(msg, sizeof(msg), fmt, local_args);
     va_end(local_args);
     snprintf(final_msg, sizeof(final_msg),
-        "[%s] [TID %" PRIu64 "] [T-%s] [%s] [%s:%d] %s\n",
+        "[%s] [TID %" PRIu64 "] [T-%s] [%s] [%s:%" PRIu32 "] %s\n",
         safe_str(ts),
         sim_thread_cur_id(),
-        get_thread_str(),
+        get_thread_str(thread_str, sizeof(thread_str)),
         get_level_str(level),
         strrchr(file, '/') ? strrchr(file, '/') + 1 : strrchr(file, '\\') ? strrchr(file, '\\') + 1 : file,
         line,
@@ -174,20 +188,28 @@ void log_out(const LogLevel level, const char* file, const uint32_t line, const 
     write_2_file(final_msg);
     s_logger_cfg.cur_lines++;
     rotate();
+    logger_unlock(&s_logger_lock);
 }
 
 LogLevel get_logger_level()
 {
-    return s_logger_cfg.lv;
+    logger_lock(&s_logger_lock);
+    const LogLevel level = s_logger_cfg.lv;
+    logger_unlock(&s_logger_lock);
+    return level;
 }
 
 void set_logger_level(const LogLevel lv)
 {
+    bool changed = false;
+    logger_lock(&s_logger_lock);
     if (s_logger_cfg.lv != lv)
     {
         s_logger_cfg.lv = lv;
-        LOG_INFO("设置日志等级为 [%s]", get_level_str(lv));
+        changed = true;
     }
+    logger_unlock(&s_logger_lock);
+    if (changed) LOG_INFO("设置日志等级为 [%s]", get_level_str(lv));
 }
 
 bool init_logger()
@@ -197,18 +219,21 @@ bool init_logger()
         fprintf(stderr, "[ERROR] 无法准备日志目录\n");
         return false;
     }
-    const uint16_t len = snprintf(s_logger_cfg.log_file, sizeof(s_logger_cfg.log_file), "%s%c%s", safe_str(s_logger_cfg.log_dir), SEP, s_file_name);
-    if ((size_t)len >= sizeof(s_logger_cfg.log_file))
+    const int len = snprintf(s_logger_cfg.log_file, sizeof(s_logger_cfg.log_file), "%s%c%s", safe_str(s_logger_cfg.log_dir), SEP, s_file_name);
+    if (len < 0 || (size_t)len >= sizeof(s_logger_cfg.log_file))
     {
         fprintf(stderr, "[ERROR] 日志文件路径太长 (最大 %zu)\n", sizeof(s_logger_cfg.log_file));
         return false;
     }
+    logger_lock(&s_logger_lock);
     s_logger_cfg.file_handle = fopen(s_logger_cfg.log_file, "a");
     if (!s_logger_cfg.file_handle)
     {
+        logger_unlock(&s_logger_lock);
         fprintf(stderr, "[ERROR] 无法打开日志文件 %s, 如果是 Linux 系统请使用 sudo 运行程序\n", s_logger_cfg.log_file);
         return false;
     }
+    logger_unlock(&s_logger_lock);
     LOG_DEBUG("日志系统初始化完成");
     LOG_DEBUG("日志等级: %s", get_level_str(s_logger_cfg.lv));
     return true;
@@ -216,7 +241,11 @@ bool init_logger()
 
 void clean_logger()
 {
-    if (!s_logger_cfg.file_handle) return;
-    fclose(s_logger_cfg.file_handle);
-    s_logger_cfg.file_handle = NULL;
+    logger_lock(&s_logger_lock);
+    if (s_logger_cfg.file_handle)
+    {
+        fclose(s_logger_cfg.file_handle);
+        s_logger_cfg.file_handle = NULL;
+    }
+    logger_unlock(&s_logger_lock);
 }

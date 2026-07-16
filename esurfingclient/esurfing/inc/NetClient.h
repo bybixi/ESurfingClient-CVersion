@@ -2,6 +2,7 @@
 #define ESURFINGCLIENT_NETCLIENT_H
 
 #include <curl/curl.h>
+#include <stdbool.h>
 
 typedef enum {
     REQUEST_ERROR = 0,
@@ -18,6 +19,10 @@ typedef struct {
     char* body_data;
     size_t body_size;
 } http_resp_t;
+
+bool init_net_client(void);
+
+void clean_net_client(void);
 
 /**
  * @brief 截取 URL 中指定参数

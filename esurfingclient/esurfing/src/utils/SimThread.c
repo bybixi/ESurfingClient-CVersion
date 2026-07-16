@@ -1,6 +1,12 @@
 #include "utils/SimThread.h"
 #include <stdlib.h>
 
+typedef struct
+{
+    sim_thread_func func;
+    void* arg;
+} sim_thread_start_t;
+
 #ifdef _WIN32
     #include <windows.h>
     
@@ -12,31 +18,32 @@
     
     static DWORD WINAPI win32_thread_func(LPVOID arg)
     {
-        sim_thread_func* func_info = (sim_thread_func*)arg;
-        sim_thread_func func = func_info[0];
-        void* func_arg = func_info[1];
-        free(func_info);
+        sim_thread_start_t* start = (sim_thread_start_t*)arg;
+        sim_thread_func func = start->func;
+        void* func_arg = start->arg;
+        free(start);
         return (DWORD)func(func_arg);
     }
     
     sim_thread_t* sim_thread_create(sim_thread_func func, void* arg)
     {
+        if (!func) return NULL;
         sim_thread_t* thread = (sim_thread_t*)malloc(sizeof(sim_thread_t));
         if (!thread) return NULL;
         
-        sim_thread_func* func_info = (sim_thread_func*)malloc(2 * sizeof(sim_thread_func));
-        if (!func_info)
+        sim_thread_start_t* start = (sim_thread_start_t*)malloc(sizeof(*start));
+        if (!start)
         {
             free(thread);
             return NULL;
         }
-        func_info[0] = func;
-        func_info[1] = arg;
+        start->func = func;
+        start->arg = arg;
         
-        thread->handle = CreateThread(NULL, 0, win32_thread_func, func_info, 0, &thread->id);
+        thread->handle = CreateThread(NULL, 0, win32_thread_func, start, 0, &thread->id);
         if (!thread->handle)
         {
-            free(func_info);
+            free(start);
             free(thread);
             return NULL;
         }
@@ -94,31 +101,32 @@
     
     static void* pthread_thread_func(void* arg)
     {
-        sim_thread_func* func_info = (sim_thread_func*)arg;
-        sim_thread_func func = func_info[0];
-        void* func_arg = func_info[1];
-        free(func_info);
+        sim_thread_start_t* start = (sim_thread_start_t*)arg;
+        sim_thread_func func = start->func;
+        void* func_arg = start->arg;
+        free(start);
         return (void*)(intptr_t)func(func_arg);
     }
     
     sim_thread_t* sim_thread_create(sim_thread_func func, void* arg)
     {
+        if (!func) return NULL;
         sim_thread_t* thread = (sim_thread_t*)malloc(sizeof(sim_thread_t));
         if (!thread) return NULL;
         
-        sim_thread_func* func_info = (sim_thread_func*)malloc(2 * sizeof(sim_thread_func));
-        if (!func_info)
+        sim_thread_start_t* start = (sim_thread_start_t*)malloc(sizeof(*start));
+        if (!start)
         {
             free(thread);
             return NULL;
         }
-        func_info[0] = func;
-        func_info[1] = arg;
+        start->func = func;
+        start->arg = arg;
         
         thread->detached = 0;
-        if (pthread_create(&thread->thread, NULL, pthread_thread_func, func_info) != 0)
+        if (pthread_create(&thread->thread, NULL, pthread_thread_func, start) != 0)
         {
-            free(func_info);
+            free(start);
             free(thread);
             return NULL;
         }

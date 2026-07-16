@@ -117,7 +117,11 @@ static char* desede_cbc_decrypt(cipher_interface_t* self, const char* hex)
     if (!data) return NULL;
     size_t bytes_len;
     uint8_t* bytes = hex_2_bytes(hex, &bytes_len);
-    if (!bytes) return NULL;
+    if (!bytes || bytes_len % 8 != 0)
+    {
+        s_free(bytes);
+        return NULL;
+    }
     size_t r1_len;
     uint8_t* r1 = desede_decrypt_cbc(bytes, bytes_len, data->key2, data->iv2, &r1_len);
     s_free(bytes);

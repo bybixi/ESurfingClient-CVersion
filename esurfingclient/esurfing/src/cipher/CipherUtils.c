@@ -7,6 +7,7 @@
 char* bytes_2_hex(const uint8_t* bytes, const size_t len)
 {
     if (!bytes || len == 0) return NULL;
+    if (len > (SIZE_MAX - 1) / 2) return NULL;
     char* hex = s_malloc(len * 2 + 1);
     if (!hex) return NULL;
     for (size_t i = 0; i < len; i++) sprintf(hex + i * 2, "%02X", bytes[i]);
@@ -24,8 +25,27 @@ uint8_t* hex_2_bytes(const char* hex, size_t* out_len)
     if (!bytes) return NULL;
     for (size_t i = 0; i < byte_len; i++)
     {
-        const char byte_str[3] = {hex[i * 2], hex[i * 2 + 1], '\0'};
-        bytes[i] = (uint8_t)strtol(byte_str, NULL, 16);
+        const unsigned char high_char = (unsigned char)hex[i * 2];
+        const unsigned char low_char = (unsigned char)hex[i * 2 + 1];
+        int high;
+        int low;
+        if (high_char >= '0' && high_char <= '9') high = high_char - '0';
+        else if (high_char >= 'a' && high_char <= 'f') high = high_char - 'a' + 10;
+        else if (high_char >= 'A' && high_char <= 'F') high = high_char - 'A' + 10;
+        else
+        {
+            s_free(bytes);
+            return NULL;
+        }
+        if (low_char >= '0' && low_char <= '9') low = low_char - '0';
+        else if (low_char >= 'a' && low_char <= 'f') low = low_char - 'a' + 10;
+        else if (low_char >= 'A' && low_char <= 'F') low = low_char - 'A' + 10;
+        else
+        {
+            s_free(bytes);
+            return NULL;
+        }
+        bytes[i] = (uint8_t)((high << 4) | low);
     }
     *out_len = byte_len;
     return bytes;
@@ -67,9 +87,10 @@ size_t s_strlen(const char* str)
 
 uint8_t* pkcs7_padding(const uint8_t* data, const size_t data_len, const size_t block_size, size_t* out_len)
 {
-    if (!data || !out_len || block_size == 0) return NULL;
+    if (!data || !out_len || block_size == 0 || block_size > UINT8_MAX) return NULL;
     size_t padding = block_size - data_len % block_size;
     if (padding == 0) padding = block_size;
+    if (data_len > SIZE_MAX - padding) return NULL;
     const size_t padded_len = data_len + padding;
     uint8_t* padded = s_malloc(padded_len);
     memcpy(padded, data, data_len);
@@ -95,6 +116,7 @@ uint8_t* pad_2_multiple(const uint8_t* data, const size_t data_len, const size_t
 {
     if (!data || !out_len || multiple == 0) return NULL;
     const size_t padding = (multiple - data_len % multiple) % multiple;
+    if (data_len > SIZE_MAX - padding) return NULL;
     const size_t padded_len = data_len + padding;
     uint8_t* padded = s_calloc(padded_len, 1);
     memcpy(padded, data, data_len);
