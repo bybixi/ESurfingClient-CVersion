@@ -16,7 +16,7 @@ on:
         description: 'Package release'
         required: true
         type: string
-        default: "6"
+        default: "7"
       sdk_version:
         description: 'OpenWrt SDK version'
         required: true

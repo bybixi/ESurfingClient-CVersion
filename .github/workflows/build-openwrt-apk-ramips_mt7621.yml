@@ -15,7 +15,7 @@ on:
       release:
         required: true
         type: string
-        default: "6"
+        default: "7"
       sdk_version:
         required: true
         type: string
