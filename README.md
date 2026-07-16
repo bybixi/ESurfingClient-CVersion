@@ -1,8 +1,12 @@
-# ESurfingClient-C (修复版)
+ # ESurfingClient-C (修复版)
 
 > 本项目 fork 自 [BadGhost520/ESurfingClient-CVersion](https://github.com/BadGhost520/ESurfingClient-CVersion)，修复了导致路由器断网、内存泄漏、磁盘写爆、DNS 崩溃等多个关键问题。
 
 > **最新编译**: [v2.0.4-r7](https://github.com/bybixi/ESurfingClient-CVersion/releases/tag/v2.0.4-r7)
+
+## 本人路由器7天负载下实际运行情况
+
+<img width="2560" height="1271" alt="image" src="https://github.com/user-attachments/assets/e54ad461-f731-48c4-9878-bdb98a41f679" />
 
 ## 与上游版本的区别
 
@@ -35,7 +39,6 @@
 | `get_last_location()` 重定向死循环 | 退出信号检查 |
 | `shut()` 线程句柄 + 数组泄漏 | `free(thread)` + `free(g_prog_status)` |
 | `clean_logger()` `return` 后死代码 (r7) | 关闭 handle 后清理无法执行的 rename 逻辑 |
-
 ### r7 稳定性与安全加固
 
 | 范围 | 修复 |
@@ -114,3 +117,5 @@ strings /usr/bin/esurfingclient | grep -c reset_network_state
 ## 致谢
 
 原作者 [BadGhost520](https://github.com/BadGhost520) 及所有贡献者
+
+还有我的钱包（改这玩意烧了我差不多40块钱的token）
