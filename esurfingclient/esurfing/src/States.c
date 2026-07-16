@@ -16,20 +16,20 @@ _Thread_local int8_t tl_thread_idx = -1;
 
 prog_status_t* g_prog_status;
 
-char g_school_network_symbol[SCHOOL_NETWORK_SYMBOL] = {0};
+_Thread_local char g_school_network_symbol[SCHOOL_NETWORK_SYMBOL] = {0};
 
-bool g_thread_keep_alive = false;
+atomic_bool g_thread_keep_alive = ATOMIC_VAR_INIT(false);
 
-bool g_is_webserver_running = false;
+atomic_bool g_is_webserver_running = ATOMIC_VAR_INIT(false);
 
-bool g_need_exit = false;
+atomic_bool g_need_exit = ATOMIC_VAR_INIT(false);
 
-bool g_prog_enabled = false;
+atomic_bool g_prog_enabled = ATOMIC_VAR_INIT(false);
 
 static void reset_host_name()
 {
     char host_name[16];
-    unsigned char host_bytes[10];
+    unsigned char host_bytes[10] = {0};
     get_rand_bytes(host_bytes, 10);
     host_bytes[0] = host_bytes[0] & 0xFEU;
     sprintf(host_name, "%02x%02x%02x%02x%02x",
@@ -43,7 +43,7 @@ static void reset_host_name()
 static void reset_client_id()
 {
     char client_id[40];
-    unsigned char client_bytes[16];
+    unsigned char client_bytes[16] = {0};
     get_rand_bytes(client_bytes, 16);
     sprintf(client_id,
         "%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x",
@@ -64,7 +64,7 @@ static void reset_client_id()
 static void reset_mac_addr()
 {
     char mac_addr[20];
-    unsigned char mac_bytes[6];
+    unsigned char mac_bytes[6] = {0};
     get_rand_bytes(mac_bytes, 6);
     mac_bytes[0] = mac_bytes[0] & 0xFEU;
     sprintf(mac_addr, "%02x:%02x:%02x:%02x:%02x:%02x",

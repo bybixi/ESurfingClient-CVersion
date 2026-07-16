@@ -29,9 +29,30 @@
 static const char s_req_content_type[] = "Content-Type: application/x-www-form-urlencoded";
 static const char s_req_accept[] = "Accept: text/html,text/xml,application/xhtml+xml,application/x-javascript,*/*";
 static const char s_generate_url[] = "http://connect.rom.miui.com/generate_204";
-static char s_school_id[SCHOOL_ID_LENGTH];
-static char s_domain[DOMAIN_LENGTH];
-static char s_area[AREA_LENGTH];
+static _Thread_local char s_school_id[SCHOOL_ID_LENGTH];
+static _Thread_local char s_domain[DOMAIN_LENGTH];
+static _Thread_local char s_area[AREA_LENGTH];
+static bool s_curl_initialized = false;
+
+bool init_net_client(void)
+{
+    if (s_curl_initialized) return true;
+    if (curl_global_init(CURL_GLOBAL_DEFAULT) != CURLE_OK) return false;
+    s_curl_initialized = true;
+    return true;
+}
+
+void clean_net_client(void)
+{
+    if (!s_curl_initialized) return;
+    curl_global_cleanup();
+    s_curl_initialized = false;
+}
+
+static bool has_dialer_context(void)
+{
+    return tl_thread_idx >= 0 && tl_thread_idx < g_prog_cnt && g_prog_status != NULL;
+}
 
 void reset_network_state()
 {
@@ -43,12 +64,13 @@ void reset_network_state()
 
 char* extract_url_param(const char* url, const char* search_str_start)
 {
-    if (url == NULL)
+    if (url == NULL || search_str_start == NULL)
     {
-        LOG_ERROR("URL 为空");
+        LOG_ERROR("URL 或参数名为空");
         return NULL;
     }
     const size_t key_len = strlen(search_str_start);
+    if (key_len > SIZE_MAX - 2) return NULL;
     char* search_pattern = malloc(key_len + 2);
     if (search_pattern == NULL)
     {
@@ -106,8 +128,20 @@ static curl_socket_t open_socket_callback(void* client_p, curlsocktype purpose, 
 }
 #endif
 
+static size_t get_header_value(const char* header, const size_t header_len,
+                               const size_t prefix_len, const char** value)
+{
+    const char* cursor = header + prefix_len;
+    const char* end = header + header_len;
+    while (cursor < end && (*cursor == ' ' || *cursor == '\t')) cursor++;
+    *value = cursor;
+    while (cursor < end && *cursor != '\r' && *cursor != '\n') cursor++;
+    return (size_t)(cursor - *value);
+}
+
 static size_t header_cb(const void* contents, const size_t size, const size_t nmemb, void* userdata)
 {
+    if (size != 0 && nmemb > SIZE_MAX / size) return 0;
     const size_t real_size = size * nmemb;
     const char* header = contents;
 
@@ -117,9 +151,8 @@ static size_t header_cb(const void* contents, const size_t size, const size_t nm
         {
             LOG_VERBOSE("原始数据: %.*s", (int)real_size, header);
 
-            const char* value = header + 9;
-            while (*value == ' ') value++;
-            const size_t valid_len = strcspn(value, "\r\n");
+            const char* value;
+            const size_t valid_len = get_header_value(header, real_size, 9, &value);
 
             size_t copy_len = valid_len;
             if (copy_len >= SCHOOL_ID_LENGTH)
@@ -141,9 +174,8 @@ static size_t header_cb(const void* contents, const size_t size, const size_t nm
         {
             LOG_VERBOSE("原始数据: %.*s", (int)real_size, header);
 
-            const char* value = header + 7;
-            while (*value == ' ') value++;
-            const size_t valid_len = strcspn(value, "\r\n");
+            const char* value;
+            const size_t valid_len = get_header_value(header, real_size, 7, &value);
 
             size_t copy_len = valid_len;
             if (copy_len >= DOMAIN_LENGTH)
@@ -165,9 +197,8 @@ static size_t header_cb(const void* contents, const size_t size, const size_t nm
         {
             LOG_VERBOSE("原始数据: %.*s", (int)real_size, header);
 
-            const char* value = header + 5;
-            while (*value == ' ') value++;
-            const size_t valid_len = strcspn(value, "\r\n");
+            const char* value;
+            const size_t valid_len = get_header_value(header, real_size, 5, &value);
 
             size_t copy_len = valid_len;
             if (copy_len >= AREA_LENGTH)
@@ -185,15 +216,14 @@ static size_t header_cb(const void* contents, const size_t size, const size_t nm
 
     if (real_size >= 9 && strncasecmp(header, "Location:", 9) == 0)
     {
-        if (tl_thread_idx != -1)
+        if (has_dialer_context())
         {
             if (!g_prog_status[tl_thread_idx].last_location_lock)
             {
                 LOG_VERBOSE("原始数据: %.*s", (int)real_size, header);
 
-                const char* value = header + 9;
-                while (*value == ' ') value++;
-                const size_t valid_len = strcspn(value, "\r\n");
+                const char* value;
+                const size_t valid_len = get_header_value(header, real_size, 9, &value);
 
                 size_t copy_len = valid_len;
                 if (copy_len >= LAST_LOCATION_LEN)
@@ -217,6 +247,7 @@ static size_t header_cb(const void* contents, const size_t size, const size_t nm
 static size_t write_cb(const void* contents, const size_t size, const size_t nmemb, void* userdata)
 {
     http_resp_t* resp = userdata;
+    if (size != 0 && nmemb > SIZE_MAX / size) return 0;
     const size_t real_size = size * nmemb;
     if (real_size > MAX_HTTP_BODY_SIZE || resp->body_size > MAX_HTTP_BODY_SIZE - real_size)
     {
@@ -415,7 +446,7 @@ http_resp_t post(const char* url, const char* data)
     if (resp_code == 302)
     {
         LOG_DEBUG("重定向, 响应码: 302");
-        if (tl_thread_idx != -1) LOG_VERBOSE("重定向至: %s", g_prog_status[tl_thread_idx].last_location);
+        if (has_dialer_context()) LOG_VERBOSE("重定向至: %s", g_prog_status[tl_thread_idx].last_location);
         resp.status = REQUEST_REDIRECT;
         return resp;
     }
@@ -448,7 +479,7 @@ http_resp_t get(const char* url)
 
     struct curl_slist* headers = NULL;
 
-    if (tl_thread_idx != -1)
+    if (has_dialer_context())
     {
         snprintf(ua, MAX_LEN, "User-Agent: %s", safe_str(g_prog_status[tl_thread_idx].login_cfg.user_agent));
         snprintf(c_id, MAX_LEN, "Client-ID: %s", safe_str(g_prog_status[tl_thread_idx].auth_cfg.client_id));
@@ -480,12 +511,12 @@ http_resp_t get(const char* url)
     curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
     curl_easy_setopt(curl, CURLOPT_DNS_CACHE_TIMEOUT, 300L);
     curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 0L);
-    if (tl_thread_idx != -1)
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_cb);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &resp);
+    if (has_dialer_context())
     {
         curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
         curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, header_cb);
-        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_cb);
-        curl_easy_setopt(curl, CURLOPT_WRITEDATA, &resp);
         curl_easy_setopt(curl, CURLOPT_MAXREDIRS, 10L);
     #ifdef __OPENWRT__
         curl_easy_setopt(curl, CURLOPT_OPENSOCKETFUNCTION, open_socket_callback);
@@ -513,7 +544,7 @@ http_resp_t get(const char* url)
     if (resp_code == 302)
     {
         LOG_DEBUG("重定向, 响应码: 302");
-        if (tl_thread_idx != -1) LOG_VERBOSE("重定向至: %s", g_prog_status[tl_thread_idx].last_location);
+        if (has_dialer_context()) LOG_VERBOSE("重定向至: %s", g_prog_status[tl_thread_idx].last_location);
         resp.status = REQUEST_REDIRECT;
         return resp;
     }

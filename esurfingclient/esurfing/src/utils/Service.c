@@ -26,7 +26,7 @@ static void WINAPI ServiceCtrlHandler(DWORD CtrlCode)
         g_ServiceStatus.dwCurrentState = SERVICE_STOP_PENDING;
         SetServiceStatus(g_StatusHandle, &g_ServiceStatus);
         SetEvent(g_ServiceStopEvent);
-        shut(0);
+        request_shutdown();
     }
 }
 

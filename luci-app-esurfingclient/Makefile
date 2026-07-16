@@ -4,8 +4,8 @@ PKG_NAME:=luci-app-esurfingclient
 PKG_LICENSE:=Apache-2.0
 PKG_LICENSE_FILES:=../LICENSE
 
-PKG_VERSION:=1.0.0
-PKG_RELEASE:=1
+PKG_VERSION:=2.0.4
+PKG_RELEASE:=7
 
 PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)
 
@@ -56,8 +56,6 @@ else
 fi
 
 rm -rf /tmp/luci-staging
-
-rm -rf /tmp/luci-*
 /etc/init.d/uhttpd restart 2>/dev/null &
 /etc/init.d/rpcd restart 2>/dev/null &
 
@@ -70,14 +68,13 @@ define Package/luci-app-esurfingclient/postrm
 echo "正在移除 ESurfingClient LuCI"
 
 rm -f /usr/lib/lua/luci/controller/esurfingclient.lua
-rm -f /www/luci-static/resources/view/esurfingclient/config.js
+rm -f /usr/lib/lua/luci/view/esurfingclient.htm
+rm -f /www/luci-static/resources/view/esurfingclient.js
 rm -f /usr/share/luci/menu.d/luci-app-esurfingclient.json
-rmdir /www/luci-static/resources/view/esurfingclient 2>/dev/null || true
-rm -f /usr/lib/lua/luci/view/esurfingclient/config.htm
-rmdir /usr/lib/lua/luci/view/esurfingclient 2>/dev/null || true
+rm -f /usr/share/rpcd/acl.d/luci-app-esurfingclient.json
 
-rm -rf /tmp/luci-*
 /etc/init.d/uhttpd restart 2>/dev/null &
+/etc/init.d/rpcd restart 2>/dev/null &
 
 echo "LuCI 界面已移除"
 exit 0

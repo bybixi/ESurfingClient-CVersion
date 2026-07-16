@@ -228,7 +228,11 @@ static char* desede_cbc_pc_decrypt(cipher_interface_t* self, const char* hex)
   if (!data) return NULL;
   size_t bytes_len;
   uint8_t* bytes = hex_2_bytes(hex, &bytes_len);
-  if (!bytes) return NULL;
+  if (!bytes || bytes_len % 8 != 0)
+  {
+    s_free(bytes);
+    return NULL;
+  }
   stage_decrypt(bytes, bytes_len, data->key1 + 0, data->key1 + 8, data->key1 + 16, data->iv1);
   stage_decrypt(bytes, bytes_len, data->key2 + 0, data->key2 + 8, data->key2 + 16, data->iv2);
   while (bytes_len > 0 && bytes[bytes_len - 1] == 0)

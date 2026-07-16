@@ -117,7 +117,7 @@ static char* aes_cbc_decrypt(cipher_interface_t* self, const char* hex)
     if (!data) return NULL;
     size_t bytes_len;
     uint8_t* bytes = hex_2_bytes(hex, &bytes_len);
-    if (!bytes || bytes_len < 32)
+    if (!bytes || bytes_len < 32 || bytes_len % 16 != 0)
     {
         s_free(bytes);
         return NULL;

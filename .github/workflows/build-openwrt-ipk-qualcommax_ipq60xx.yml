@@ -38,7 +38,7 @@ jobs:
       - name: 更新 Makefile 版本号
         run: |
           sed -i "s/PKG_VERSION:=.*/PKG_VERSION:=${{ inputs.version || '2.0.4' }}/" esurfingclient/Makefile
-          sed -i "s/PKG_RELEASE:=.*/PKG_RELEASE:=${{ inputs.release || '6' }}/" esurfingclient/Makefile
+          sed -i "s/PKG_RELEASE:=.*/PKG_RELEASE:=${{ inputs.release || '7' }}/" esurfingclient/Makefile
 
       - name: 安装软件包 (最多重试 3 次)
         run: |
@@ -139,11 +139,11 @@ jobs:
 
           make package/esurfingclient/compile -j$(nproc) V=s 2>&1 | tail -50
 
-          find bin/packages -name "esurfingclient*.ipk" -exec cp {} ../esurfingclient_${{ inputs.version || '2.0.4' }}-${{ inputs.release || '6' }}_qualcommax_ipq60xx.ipk \;
+          find bin/packages -name "esurfingclient*.ipk" -exec cp {} ../esurfingclient_${{ inputs.version || '2.0.4' }}-${{ inputs.release || '7' }}_qualcommax_ipq60xx.ipk \;
 
       - name: 上传工件
         uses: actions/upload-artifact@v7
         with:
-          name: esurfingclient_${{ inputs.version || '2.0.4' }}-${{ inputs.release || '6' }}_qualcommax_ipq60xx-ipk
-          path: esurfingclient_${{ inputs.version || '2.0.4' }}-${{ inputs.release || '6' }}_qualcommax_ipq60xx.ipk
+          name: esurfingclient_${{ inputs.version || '2.0.4' }}-${{ inputs.release || '7' }}_qualcommax_ipq60xx-ipk
+          path: esurfingclient_${{ inputs.version || '2.0.4' }}-${{ inputs.release || '7' }}_qualcommax_ipq60xx.ipk
           retention-days: 30

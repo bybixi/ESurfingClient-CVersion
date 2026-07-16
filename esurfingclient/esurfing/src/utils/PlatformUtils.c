@@ -1,4 +1,5 @@
 #include "utils/PlatformUtils.h"
+#include "utils/Shutdown.h"
 #include "utils/Logger.h"
 #include "utils/cJSON.h"
 #include "States.h"
@@ -25,6 +26,8 @@ static const char config_file[] = "/etc/config/esurfingclient";
 #define DIALER_CONFIG_FILE "ESurfingClient.json"
 static char config_file[PATH_MAX + 1 + sizeof(DIALER_CONFIG_FILE)];
 #endif
+
+#define MAX_CONFIG_FILE_SIZE (1024 * 1024)
 
 typedef struct
 {
@@ -213,17 +216,30 @@ bytes_t str2bytes(const char* str)
 uint64_t str2uint64(const char* str)
 {
     if (!str) return 0;
-    while (isspace(*str)) str++;
-    if (*str == '\0') return 0;
+    while (isspace((unsigned char)*str)) str++;
+    if (*str == '\0' || *str == '-') return 0;
     char* end_ptr;
     errno = 0;
-    const uint64_t value = strtoll(str, &end_ptr, 10);
+    const uint64_t value = strtoull(str, &end_ptr, 10);
     if (errno == ERANGE) return 0;
     if (end_ptr == str) return 0;
-    while (isspace(*end_ptr)) end_ptr++;
+    while (isspace((unsigned char)*end_ptr)) end_ptr++;
     if (*end_ptr != '\0') return 0;
     return value;
 }
+
+#ifdef __OPENWRT__
+static bool parse_hex_uint32(const char* str, uint32_t* value)
+{
+    if (!str || !value || *str == '\0' || *str == '-' || *str == '+') return false;
+    char* end_ptr;
+    errno = 0;
+    const unsigned long long parsed = strtoull(str, &end_ptr, 16);
+    if (errno == ERANGE || end_ptr == str || *end_ptr != '\0' || parsed > UINT32_MAX) return false;
+    *value = (uint32_t)parsed;
+    return true;
+}
+#endif
 
 char* uint642str(const uint64_t num)
 {
@@ -251,15 +267,29 @@ uint64_t get_cur_tm_ms()
 
 void get_rand_bytes(uint8_t* buf, const size_t len)
 {
+    if (!buf || len == 0) return;
+    memset(buf, 0, len);
 #ifdef _WIN32
+    if (len > UINT32_MAX) return;
     HCRYPTPROV h_crypt_prov;
     if (!CryptAcquireContext(&h_crypt_prov, NULL, NULL, PROV_RSA_FULL, CRYPT_VERIFYCONTEXT)) return;
-    CryptGenRandom(h_crypt_prov, len, buf);
+    CryptGenRandom(h_crypt_prov, (DWORD)len, buf);
     CryptReleaseContext(h_crypt_prov, 0);
 #else
     const int fd = open("/dev/urandom", O_RDONLY);
     if (fd == -1) return;
-    read(fd, buf, len);
+    size_t offset = 0;
+    while (offset < len)
+    {
+        const ssize_t bytes_read = read(fd, buf + offset, len - offset);
+        if (bytes_read > 0)
+        {
+            offset += (size_t)bytes_read;
+            continue;
+        }
+        if (bytes_read < 0 && errno == EINTR) continue;
+        break;
+    }
     close(fd);
 #endif
 }
@@ -272,7 +302,7 @@ void sleep_ms(const uint64_t ms, const bool can_stop)
 
     while (elapsed < ms && (can_stop ? g_thread_keep_alive : true))
     {
-        if (tl_thread_idx != -1)
+        if (tl_thread_idx >= 0 && tl_thread_idx < g_prog_cnt && g_prog_status != NULL)
         {
             if (g_prog_status[tl_thread_idx].runtime_status.is_running == false || g_prog_status[tl_thread_idx].runtime_status.is_need_reset)
             {
@@ -281,7 +311,7 @@ void sleep_ms(const uint64_t ms, const bool can_stop)
         }
         else
         {
-            if (g_need_exit)
+            if (g_need_exit || is_shutdown_requested())
             {
                 return;
             }
@@ -344,9 +374,9 @@ const char* safe_str(const char* str)
 
 char* create_xml_payload(const XmlChoose choose)
 {
-    char cur_tm[32];
+    char cur_tm[32] = {0};
     get_fmt_time(cur_tm, CONSOLE_FORMAT);
-    static char xml[XML_BUFFER_SIZE] = "";
+    static _Thread_local char xml[XML_BUFFER_SIZE];
     LOG_DEBUG("XML 选择代码: %d", choose);
     uint16_t xml_len = 0;
     switch (choose)
@@ -478,38 +508,54 @@ char* clean_CDATA(const char* text)
 
 bool save_cfg(char* configs_str)
 {
+    (void)configs_str;
     LOG_INFO("保存配置中");
     LOG_INFO("仅会保存第一个可用配置");
 
     cJSON* cfg_json = cJSON_CreateObject();
+    cJSON* accounts = cJSON_CreateArray();
+    cJSON* account = cJSON_CreateObject();
+    if (!cfg_json || !accounts || !account || !g_prog_status || g_prog_cnt <= 0)
+    {
+        cJSON_Delete(cfg_json);
+        cJSON_Delete(accounts);
+        cJSON_Delete(account);
+        LOG_ERROR("保存配置时无法创建 JSON 数据");
+        return false;
+    }
 
     cJSON_AddBoolToObject(cfg_json, "enabled", g_prog_enabled);
     cJSON_AddNumberToObject(cfg_json, "log_lv", get_logger_level());
-
-    cJSON* accounts = cJSON_CreateArray();
-    cJSON_AddItemToObject(cfg_json, "accounts", accounts);
-
-    cJSON* account = cJSON_CreateObject();
-
     cJSON_AddStringToObject(account, "username", g_prog_status[0].login_cfg.usr);
     cJSON_AddStringToObject(account, "password", g_prog_status[0].login_cfg.pwd);
     cJSON_AddStringToObject(account, "channel", g_prog_status[0].login_cfg.chn);
-
     cJSON_AddItemToArray(accounts, account);
+    cJSON_AddItemToObject(cfg_json, "accounts", accounts);
 
     char* json = cJSON_Print(cfg_json);
+    cJSON_Delete(cfg_json);
+    if (!json)
+    {
+        LOG_ERROR("保存配置时无法序列化 JSON 数据");
+        return false;
+    }
 
     FILE* cfg_file = fopen(config_file, "w");
     if (!cfg_file)
     {
         LOG_ERROR("无法生成文件: %s", config_file);
+        free(json);
         return false;
     }
-    fprintf(cfg_file, "%s", json);
-    fclose(cfg_file);
+    const bool write_ok = fputs(json, cfg_file) != EOF && fflush(cfg_file) == 0;
+    const bool close_ok = fclose(cfg_file) == 0;
 
     free(json);
-    cJSON_Delete(cfg_json);
+    if (!write_ok || !close_ok)
+    {
+        LOG_ERROR("配置文件写入失败: %s", config_file);
+        return false;
+    }
     return true;
 }
 
@@ -523,7 +569,7 @@ bool load_cfg()
         LOG_ERROR("获取可执行文件路径失败, 请检查权限后重启");
         while (true)
         {
-            if (g_need_exit)
+            if (g_need_exit || is_shutdown_requested())
             {
                 return false;
             }
@@ -535,7 +581,14 @@ bool load_cfg()
 #endif
 
     FILE* cfg_file = fopen(config_file, "r");
-    if (!cfg_file || fgetc(cfg_file) == EOF)
+    bool create_default = cfg_file == NULL;
+    if (cfg_file != NULL && fgetc(cfg_file) == EOF)
+    {
+        fclose(cfg_file);
+        cfg_file = NULL;
+        create_default = true;
+    }
+    if (create_default)
     {
         LOG_ERROR("无法打开配置文件或配置文件为空: %s", config_file);
         LOG_INFO("创建新的默认配置文件");
@@ -545,7 +598,7 @@ bool load_cfg()
             LOG_FATAL("无法生成文件: %s, 请检查权限后重启", config_file);
             while (true)
             {
-                if (g_need_exit)
+                if (g_need_exit || is_shutdown_requested())
                 {
                     return false;
                 }
@@ -554,10 +607,10 @@ bool load_cfg()
         }
         fprintf(new_cfg, "%s", s_default_cfg);
         fclose(new_cfg);
-        LOG_INFO("创建完成, 请在 %s 填写账号数据, 然后重启");
+        LOG_INFO("创建完成, 请在 %s 填写账号数据, 然后重启", config_file);
         while (true)
         {
-            if (g_need_exit)
+            if (g_need_exit || is_shutdown_requested())
             {
                 return false;
             }
@@ -565,12 +618,41 @@ bool load_cfg()
         }
     }
 
-    fseek(cfg_file, 0, SEEK_END);
+    if (fseek(cfg_file, 0, SEEK_END) != 0)
+    {
+        LOG_FATAL("无法定位配置文件末尾");
+        fclose(cfg_file);
+        return false;
+    }
     const long len = ftell(cfg_file);
-    fseek(cfg_file, 0, SEEK_SET);
+    if (len < 0 || len > MAX_CONFIG_FILE_SIZE)
+    {
+        LOG_FATAL("配置文件大小无效或超过 %d 字节", MAX_CONFIG_FILE_SIZE);
+        fclose(cfg_file);
+        return false;
+    }
+    if (fseek(cfg_file, 0, SEEK_SET) != 0)
+    {
+        LOG_FATAL("无法回到配置文件开头");
+        fclose(cfg_file);
+        return false;
+    }
 
     char* cfg_data = malloc(len + 1);
-    fread(cfg_data, 1, len, cfg_file);
+    if (!cfg_data)
+    {
+        LOG_FATAL("读取配置文件时分配内存失败");
+        fclose(cfg_file);
+        return false;
+    }
+    const size_t bytes_read = fread(cfg_data, 1, (size_t)len, cfg_file);
+    if (bytes_read != (size_t)len)
+    {
+        LOG_FATAL("配置文件读取不完整");
+        free(cfg_data);
+        fclose(cfg_file);
+        return false;
+    }
     cfg_data[len] = '\0';
     fclose(cfg_file);
 
@@ -581,7 +663,7 @@ bool load_cfg()
         LOG_FATAL("JSON 解析失败, 请检查后重启");
         while (true)
         {
-            if (g_need_exit)
+            if (g_need_exit || is_shutdown_requested())
             {
                 return false;
             }
@@ -590,7 +672,8 @@ bool load_cfg()
     }
 
     const cJSON* log_lv = cJSON_GetObjectItem(cfg_json, "log_lv");
-    if (log_lv && cJSON_IsNumber(log_lv))
+    if (log_lv && cJSON_IsNumber(log_lv) &&
+        log_lv->valueint >= LOG_LEVEL_NONE && log_lv->valueint <= LOG_LEVEL_VERBOSE)
     {
         set_logger_level(log_lv->valueint);
     }
@@ -601,12 +684,13 @@ bool load_cfg()
     }
 
     const cJSON* enabled = cJSON_GetObjectItem(cfg_json, "enabled");
-    if (enabled == NULL)
+    if (enabled == NULL || !cJSON_IsBool(enabled))
     {
         LOG_WARN("enabled 参数不存在, 请填写后重启程序");
+        cJSON_Delete(cfg_json);
         while (true)
         {
-            if (g_need_exit)
+            if (g_need_exit || is_shutdown_requested())
             {
                 return false;
             }
@@ -617,9 +701,10 @@ bool load_cfg()
     if (cJSON_IsFalse(enabled))
     {
         LOG_WARN("配置文件中禁用了程序启动, 请开启后重启程序");
+        cJSON_Delete(cfg_json);
         while (true)
         {
-            if (g_need_exit)
+            if (g_need_exit || is_shutdown_requested())
             {
                 return false;
             }
@@ -636,7 +721,7 @@ bool load_cfg()
         cJSON_Delete(cfg_json);
         while (true)
         {
-            if (g_need_exit)
+            if (g_need_exit || is_shutdown_requested())
             {
                 return false;
             }
@@ -644,22 +729,37 @@ bool load_cfg()
         }
     }
 
-    const uint8_t cnt = cJSON_GetArraySize(accounts);
+    const int account_count = cJSON_GetArraySize(accounts);
+    if (account_count > INT8_MAX)
+    {
+        LOG_FATAL("账号配置数量超过上限: %d", INT8_MAX);
+        cJSON_Delete(cfg_json);
+        return false;
+    }
+    const uint8_t cnt = (uint8_t)account_count;
 
     int8_t valid_cnt = 0;
 
 #ifdef __OPENWRT__
     LOG_INFO("OpenWRT 环境, 会尝试加载所有有效配置");
 
-    prog_status_t* new_prog_status = realloc(g_prog_status, sizeof(prog_status_t) * cnt);
+    prog_status_t* new_prog_status = calloc(cnt, sizeof(prog_status_t));
     if (new_prog_status)
     {
+        free(g_prog_status);
         g_prog_status = new_prog_status;
-        memset(g_prog_status, 0, sizeof(prog_status_t) * cnt);
+        for (uint8_t i = 0; i < cnt; i++)
+        {
+            atomic_init(&g_prog_status[i].runtime_status.is_initialized, false);
+            atomic_init(&g_prog_status[i].runtime_status.is_running, false);
+            atomic_init(&g_prog_status[i].runtime_status.is_authed, false);
+            atomic_init(&g_prog_status[i].runtime_status.is_need_reset, false);
+        }
     }
     else
     {
         LOG_FATAL("重分配内存失败");
+        cJSON_Delete(cfg_json);
         return false;
     }
 
@@ -675,7 +775,7 @@ bool load_cfg()
         const cJSON* mark = cJSON_GetObjectItem(account, "mark");
 
         // 检查账号
-        if (usr == NULL)
+        if (!cJSON_IsString(usr) || usr->valuestring == NULL)
         {
             LOG_WARN("配置 %" PRIu8 " username 参数不存在, 跳过当前配置", i + 1);
             continue;
@@ -685,9 +785,14 @@ bool load_cfg()
             LOG_WARN("配置 %" PRIu8 " username 参数为空, 跳过当前配置", i + 1);
             continue;
         }
+        if (strlen(usr->valuestring) >= USR_LEN)
+        {
+            LOG_WARN("配置 %" PRIu8 " username 参数过长, 跳过当前配置", i + 1);
+            continue;
+        }
 
         // 检查密码
-        if (pwd == NULL)
+        if (!cJSON_IsString(pwd) || pwd->valuestring == NULL)
         {
             LOG_WARN("配置 %" PRIu8 " password 参数不存在, 跳过当前配置", i + 1);
             continue;
@@ -697,19 +802,24 @@ bool load_cfg()
             LOG_WARN("配置 %" PRIu8 " password 参数为空, 跳过当前配置", i + 1);
             continue;
         }
+        if (strlen(pwd->valuestring) >= PWD_LEN)
+        {
+            LOG_WARN("配置 %" PRIu8 " password 参数过长, 跳过当前配置", i + 1);
+            continue;
+        }
 
         snprintf(g_prog_status[valid_i].login_cfg.usr, USR_LEN, "%s", safe_str(usr->valuestring));
         snprintf(g_prog_status[valid_i].login_cfg.pwd, PWD_LEN, "%s", safe_str(pwd->valuestring));
 
         // 检查通道
-        if (chn == NULL)
+        if (!cJSON_IsString(chn) || chn->valuestring == NULL)
         {
             LOG_WARN("配置 %" PRIu8 " channel 参数不存在, 使用默认通道", i + 1);
             snprintf(g_prog_status[valid_i].login_cfg.chn, CHN_LEN, "%s", "phone");
         }
-        else if (chn->valuestring[0] == '\0')
+        else if (chn->valuestring[0] == '\0' || strlen(chn->valuestring) >= CHN_LEN)
         {
-            LOG_WARN("配置 %" PRIu8 " channel 参数为空, 使用默认通道", i + 1);
+            LOG_WARN("配置 %" PRIu8 " channel 参数为空或过长, 使用默认通道", i + 1);
             snprintf(g_prog_status[valid_i].login_cfg.chn, CHN_LEN, "%s", "phone");
         }
         else
@@ -732,7 +842,7 @@ bool load_cfg()
         }
 
         // 检查标记值
-        if (mark == NULL)
+        if (!cJSON_IsString(mark) || mark->valuestring == NULL)
         {
             if (use_cus_mark)
             {
@@ -752,7 +862,13 @@ bool load_cfg()
             }
             if (mark->valuestring[0] != '\0')
             {
-                g_prog_status[valid_i].login_cfg.mark = strtoul(mark->valuestring, NULL, 16);
+                uint32_t parsed_mark;
+                if (!parse_hex_uint32(mark->valuestring, &parsed_mark))
+                {
+                    LOG_WARN("配置 %" PRIu8 " mark 参数无效, 将跳过该配置", i + 1);
+                    continue;
+                }
+                g_prog_status[valid_i].login_cfg.mark = parsed_mark;
                 g_prog_status[valid_i].login_cfg.use_cus_mark = true;
                 use_cus_mark = true;
                 LOG_DEBUG("使用自定义标记值: %" PRIu32 " (0x%x)", g_prog_status[valid_i].login_cfg.mark, g_prog_status[valid_i].login_cfg.mark);
@@ -787,7 +903,7 @@ bool load_cfg()
         const cJSON* chn = cJSON_GetObjectItem(account, "channel");
 
         // 检查账号
-        if (usr == NULL)
+        if (!cJSON_IsString(usr) || usr->valuestring == NULL)
         {
             LOG_WARN("配置 %" PRIu8 " username 参数不存在, 跳过当前配置", i + 1);
             continue;
@@ -797,9 +913,14 @@ bool load_cfg()
             LOG_WARN("配置 %" PRIu8 " username 参数为空, 跳过当前配置", i + 1);
             continue;
         }
+        if (strlen(usr->valuestring) >= USR_LEN)
+        {
+            LOG_WARN("配置 %" PRIu8 " username 参数过长, 跳过当前配置", i + 1);
+            continue;
+        }
 
         // 检查密码
-        if (pwd == NULL)
+        if (!cJSON_IsString(pwd) || pwd->valuestring == NULL)
         {
             LOG_WARN("配置 %" PRIu8 " password 参数不存在, 跳过当前配置", i + 1);
             continue;
@@ -809,19 +930,24 @@ bool load_cfg()
             LOG_WARN("配置 %" PRIu8 " password 参数为空, 跳过当前配置", i + 1);
             continue;
         }
+        if (strlen(pwd->valuestring) >= PWD_LEN)
+        {
+            LOG_WARN("配置 %" PRIu8 " password 参数过长, 跳过当前配置", i + 1);
+            continue;
+        }
 
         snprintf(g_prog_status[0].login_cfg.usr, USR_LEN, "%s", safe_str(usr->valuestring));
         snprintf(g_prog_status[0].login_cfg.pwd, PWD_LEN, "%s", safe_str(pwd->valuestring));
 
         // 检查通道
-        if (chn == NULL)
+        if (!cJSON_IsString(chn) || chn->valuestring == NULL)
         {
             LOG_WARN("配置 %" PRIu8 " channel 参数不存在, 使用默认通道", i + 1);
             snprintf(g_prog_status[0].login_cfg.chn, CHN_LEN, "%s", "phone");
         }
-        else if (chn->valuestring[0] == '\0')
+        else if (chn->valuestring[0] == '\0' || strlen(chn->valuestring) >= CHN_LEN)
         {
-            LOG_WARN("配置 %" PRIu8 " channel 参数为空, 使用默认通道", i + 1);
+            LOG_WARN("配置 %" PRIu8 " channel 参数为空或过长, 使用默认通道", i + 1);
             snprintf(g_prog_status[0].login_cfg.chn, CHN_LEN, "%s", "phone");
         }
         else
@@ -858,7 +984,7 @@ bool load_cfg()
         LOG_FATAL("无可用配置, 请检查后重启程序");
         while (true)
         {
-            if (g_need_exit)
+            if (g_need_exit || is_shutdown_requested())
             {
                 return false;
             }

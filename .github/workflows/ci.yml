@@ -1,0 +1,62 @@
+name: C Static Checks
+
+on:
+  push:
+    paths:
+      - 'esurfingclient/esurfing/**'
+      - 'esurfingclient/Makefile'
+      - 'esurfingclient/init.d/**'
+      - 'luci-app-esurfingclient/**'
+      - '.github/workflows/ci.yml'
+  pull_request:
+    paths:
+      - 'esurfingclient/esurfing/**'
+      - 'esurfingclient/Makefile'
+      - 'esurfingclient/init.d/**'
+      - 'luci-app-esurfingclient/**'
+      - '.github/workflows/ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  syntax-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install headers
+        run: sudo apt-get update && sudo apt-get install -y libcurl4-openssl-dev libssl-dev
+      - name: Check C sources
+        working-directory: esurfingclient/esurfing
+        shell: bash
+        run: |
+          mapfile -d '' sources < <(find src -name '*.c' \
+            ! -path '*/webserver/mongoose.c' \
+            ! -path '*/utils/cJSON.c' -print0)
+          gcc -std=gnu11 -Wall -Wextra -Wno-unused-parameter -fsyntax-only \
+            -Iinc \
+            -DPROGRAM_VERSION='"2.0.4"' \
+            -DPROGRAM_FULL_VERSION='"2.0.4-r7"' \
+            -DWEB_ROOT_PATH='"portal"' \
+            "${sources[@]}" Main.c \
+            $(pkg-config --cflags libcurl openssl) -pthread
+
+          mapfile -d '' openwrt_sources < <(find src -name '*.c' \
+            ! -path '*/webserver/*' \
+            ! -path '*/utils/cJSON.c' \
+            ! -path '*/utils/SimProcess.c' \
+            ! -path '*/utils/Service.c' -print0)
+          gcc -std=gnu11 -Wall -Wextra -Wno-unused-parameter -fsyntax-only \
+            -Iinc \
+            -D__OPENWRT__=1 \
+            -DPROGRAM_VERSION='"2.0.4"' \
+            -DPROGRAM_FULL_VERSION='"2.0.4-r7"' \
+            -DWEB_ROOT_PATH='"portal"' \
+            "${openwrt_sources[@]}" Main.c \
+            $(pkg-config --cflags libcurl openssl) -pthread
+      - name: Check scripts and LuCI JavaScript
+        run: |
+          sh -n esurfingclient/init.d/esurfingclient.init
+          node --check luci-app-esurfingclient/luci/www/luci-static/resources/view/esurfingclient.js
+          node --check esurfingclient/esurfing/portal/assets/js/main.js
+          node --check esurfingclient/esurfing/portal/assets/js/toggleTheme.js
