@@ -1,117 +1,121 @@
-**1/**
-How long to crack a 256-bit Bitcoin wallet?
-The universe dies first. 🔒
+ # ESurfingClient-C (修复版)
 
-But what if the wallet's "randomness" was never random?
-We fully reproduced the ColdCard Yasmarang PRNG flaw and slashed the crack complexity from **2²⁵⁶ to 2⁴⁰**.
+> 本项目 fork 自 [BadGhost520/ESurfingClient-CVersion](https://github.com/BadGhost520/ESurfingClient-CVersion)，修复了导致路由器断网、内存泄漏、磁盘写爆、DNS 崩溃等多个关键问题。
 
-**A 2²¹⁶× reduction.** 216 orders of magnitude, gone.
-The word "impossible" just got rewritten. 🧵👇
+> **最新编译**: [v2.0.4-r7](https://github.com/bybixi/ESurfingClient-CVersion/releases/tag/v2.0.4-r7)
 
-**2/**
-📦 Two weapons, one mission: turn "un-enumerable" into "enumerated."
+## 本人路由器7天负载下实际运行情况
 
-⚡ **Yasmarang-Streaming** — pure streaming engine. States in, addresses out, memory ≈ 0. 42 states/sec, 2× the Python original.
+<img width="2560" height="1271" alt="image" src="https://github.com/user-attachments/assets/e54ad461-f731-48c4-9878-bdb98a41f679" />
 
-💾 **Yasmarang-Cached** — the real game-breaker 👇
+## 与上游版本的区别
 
-**3/**
-Why does Cached hit different?
+### 断网修复（核心）
 
-✅ **SQLite permanent cache** — every computed state banked forever; PBKDF2 (90% of compute) skipped outright
-✅ **Checkpoint & resume** — Ctrl-C whenever. 100k states today, continue tomorrow — siege the whole space, slice by slice
-✅ **Free retargeting** — new target list? The entire space is already waiting in the DB. Re-screen in seconds
-✅ **Cross-implementation** — Python and Go resume each other's databases, byte-identical fingerprints
+| 问题 | 根因 | 修复 |
+|------|------|------|
+| 进程挂死无日志 | `curl_easy_perform()` 卡在 DNS 解析，无连接超时 | `CURLOPT_CONNECTTIMEOUT` (5s) + `CURLOPT_NOSIGNAL` |
+| 内存泄漏 OOM | 5 个函数中 `body_data` 未释放 | 所有 `get()`/`post()` 返回后 `free(body_data)` |
+| 重连认证失败 | `s_school_id`/`s_domain`/`s_area` 用过期值 | 重连前 `reset_network_state()` 清空 |
+| 重定向 URL 过期 | `last_location_lock` 不重置 | `clean()` 中重置 |
 
-Compute once. Harvest forever. 🎯
+### 磁盘/DNS 修复
 
-**4/**
-What can it enumerate? **Everything.** 🔍
+| 问题 | 根因 | 修复 |
+|------|------|------|
+| `/tmp` 被日志写满 | `log_lv=VERBOSE` 每秒 1 条，2 天写满 117MB | 默认 WARN，256KB 轮转，最多 2 个文件 |
+| DNS 打挂 dnsmasq | 每秒 curl 无 DNS 缓存 | `CURLOPT_DNS_CACHE_TIMEOUT=300s` |
+| 高频 CPU/网络 | 在线每秒 `check_network_status()` | 轮询间隔 1s → 5s |
+| procd 日志刷屏 (r7) | `stdout 1/stderr 1` 所有日志重复输出到系统日志 | 改为 `stdout 0/stderr 0` |
+| 配置文件默认 VERBOSE (r7) | 多处 `log_lv` 默认值不一致 (4/5/6) | 统一为 3 (WARN)：config.json、LuCI、代码 |
 
-▪️ Boot time windows (SysTick + RTC dual time sources, any range)
-▪️ Device UID (single / range / batch / BCD grid / full space)
-▪️ UID unknown? Pad folding still covers the entire 2³²
-▪️ Mk4+ 32-bit reseed candidates
-▪️ PRNG stream offsets
-▪️ Precision tiers: smoke test → 20M states/sec
+### 多线程优雅退出
 
-Every state → 24-word mnemonic → 40+ addresses → target matching, **zero false negatives**.
-Every coin in the space is within range. 🎯
+| 问题 | 修复 |
+|------|------|
+| `run()` `retry_*` 是 `static` 共享变量 → 数据竞争 | `static _Thread_local` |
+| watchdog `sim_thread_destroy()` 释放运行中的线程 | 设 `is_running=false` 等待自然退出 |
+| `term()` 重试不检查退出标志 | `g_thread_keep_alive` 检查 |
+| `get_last_location()` 重定向死循环 | 退出信号检查 |
+| `shut()` 线程句柄 + 数组泄漏 | `free(thread)` + `free(g_prog_status)` |
+| `clean_logger()` `return` 后死代码 (r7) | 关闭 handle 后清理无法执行的 rename 逻辑 |
+### r7 稳定性与安全加固
 
-**5/**
-Intel is the trigger. 🕵️
+| 范围 | 修复 |
+|------|------|
+| 并发状态 | 运行状态改用 C11 原子变量；认证线程的 XML、网络响应头状态改为线程局部存储 |
+| 线程创建 | 修复将普通指针存入函数指针数组导致的未定义行为 |
+| 安全退出 | 信号处理器只设置退出标志，由主线程统一停止 Web、认证线程、curl 和日志系统 |
+| 网络请求 | 统一初始化/清理 libcurl，限制响应体大小，并对响应头长度和回调乘法溢出进行检查 |
+| 配置读取 | 限制配置文件大小，校验 JSON 类型、账号字段长度、账号数量和 OpenWrt `mark` 值 |
+| 加解密 | 拒绝非法十六进制字符及非完整分组密文，补充长度溢出检查 |
+| Web 管理页 | 仅监听 `127.0.0.1:8888`，配置接口不再返回明文密码，并修复重复响应与 JSON 泄漏 |
+| OpenWrt/LuCI | 主程序包按目标架构构建，收紧日志 ACL，并修复卸载脚本清理路径 |
 
-🔗 **On-chain intel** — first TX time → pin the wallet's birth window
-🆔 **Device UID** — deletes the 2³² folded space in one stroke
-⏱️ **Boot time** — every 10× tighter window = 10× less compute
+### CI 修复
 
-The tool enumerates all three: any window, any UID sweep, folding as fallback.
-**The sharper the intel, the closer 2⁴⁰ gets to "one afternoon."**
-No intel? The tool brute-lays the groundwork, grinding forward inch by inch.
+| 问题 | 修复 |
+|------|------|
+| `feeds install esurfingclient` 失败 | 本地包不需要 |
+| `workflow_dispatch` `inputs` 为空 | `\|\| '默认值'` fallback |
+| SDK 缓存导致不重编译 | 先 `rm -rf` 缓存再 `cp` 源码 |
+| 缺少快速 C 代码检查 | 新增桌面 Linux 与 OpenWrt 两套 C11 `-fsyntax-only` CI |
 
-**6/**
-This is what we proved:
+## 安装方法
 
-Cryptographic walls are never toppled by brute force.
-They're opened from the inside — by **one faulty random number**. 🏰💥
+### OpenWrt (mediatek_filogic)
 
-A universe-scale problem → an afternoon's engineering.
-The tool is ready. The rest is just time. ⏳
+```bash
+wget https://github.com/bybixi/ESurfingClient-CVersion/releases/download/v2.0.4-r7/esurfingclient_2.0.4-7_mediatek_filogic.ipk -O /tmp/esurfingclient.ipk
+opkg install /tmp/esurfingclient.ipk --force-reinstall
+/etc/init.d/esurfingclient restart
+```
 
-#COLDCARD #BitcoinHack #CryptoSecurity #SeedSecurity #HardwareWallet #selfcustody
--------------2
-Token usage monitor CLI · Linux + Windows
+### 验证修复
 
-Static Go build · symbols stripped · zero egress · zero telemetry
-SHA256 verified · strace / Wireshark self-audit ready
+```bash
+# 确认是修复版（应输出 1）
+strings /usr/bin/esurfingclient | grep -c reset_network_state
+```
 
-Tiers:
+### 其它架构
 
-Streaming + README .............. 0.0033 USDT
-Cached    + README .............. 0.01 BTC
-Architecture source (Streaming | Cached) ... 0.018 BTC
+从 [Releases](https://github.com/bybixi/ESurfingClient-CVersion/releases) 下载。
 
-BTC: bc1qk3dvn48grr3dkmnfwlyux6vy5vqwdezts9lxgx
+## 原项目说明
 
-EMAIL：gatherone@proton.me
+根据 Rsplwe 大佬的 Kotlin 源码编写的纯 C 版本天翼校园认证客户端。程序文件仅 2MB，跨平台跨架构，支持 OpenWrt / Windows / Linux / macOS。
 
-Flow: pay -> DM @YOUR_X_HANDLE with tx screenshot -> delivery within 12h of confirmation
+> 理论上只要是用天翼校园网客户端的学校都可以用，不论省份。
 
----
+## 支持的系统和架构
 
-[Thread 1/3]
-Why static Go?
-Single-binary deploy, zero runtime deps.
-Symbols stripped - reversing cost ~= rewriting.
-Want to audit? Buy the source tier. Source = docs.
+| 系统 | 架构 | 包管理器 |
+|:---:|:---:|:---:|
+| Windows | x86_64 | / |
+| Linux | x86_64 | / |
+| macOS | x86_64 / arm64 | / |
+| OpenWrt | x86_64 / ramips_mt7621 / qualcommax_ipq60xx / mediatek_filogic | opkg / apk |
 
-[Thread 2/3]
-Zero egress means: no network calls except the LLM API you explicitly invoke.
-No telemetry, no data collection.
-Verify it yourself with tcpdump / Wireshark in 2 minutes.
+## 使用教程
 
-[Thread 3/3]
-Delivery package:
-• Linux + Windows binaries
-• README deployment notes
-• SHA256 checksums
-Source tier adds full architecture annotations and reproducible build scripts.
+- [Windows, Linux, macOS 环境](Desktop.md)
+- [OpenWRT 环境](OpenWRT.md)
+- [OpenWRT 进阶 - 多播](OpenWRT_mwan3.md)
+- [自行编译指南](Compile.md)
 
-#COLDCARD #BitcoinHack #CryptoSecurity #SeedSecurity #HardwareWallet #selfcustody   
-                                                                                             LION626GROUP.
+## AI 辅助声明
 
-BY THE WAY:
-Gatherone deadline has passed. We have not received payment, and we are done waiting.We are releasing your data.
-  gatherone DB: the "core ledger" of a cross-platform ad business.
+本项目修复由 AI 辅助完成：
 
-  44GB hosting $721M+ in cumulative ad spend across Meta/Google/TikTok — 14.97M placement rows, 114K accounts, 790
-  clients, 83 countries.
+- **DeepSeek** / **MiMo** — 代码编写
+- **ChatGPT** — 代码审查
+- **Claude Code** / **Codex** 插件 — 代码编写与集成
 
-  Gaming vertical leads at $226M. Top client JOYFUL alone: $114M.
-NOW everybody can download and watch。
-AND WE BUILD A ENUMTOOLS OF COLDCARD ENUMTOOLS
+所有 AI 产出均已人工审查确认后合并。
 
-https://github.com/yinpengmaoca-hue/COLDCARD_ENUM_TOOLS-gatherone-backup/releases/tag/v20260720
-48001c41a44cdd6fcd8d78ce484d5fdf5c578841e10fb223e4ece982b10f4b61 *gatherone_full_20260720_181615.sql.gz.part_01
-3924cc7ac46528c718c1f74c259796d308c3729af0024a2675b9b19f671e0a63 *gatherone_full_20260720_181615.sql.gz.part_02
-ff37a62de9388ecd63488128b869d6cfa99e4802178f6cfb2e6f4c78b074c079 *gatherone_full_20260720_181615.sql.gz.part_03
+## 致谢
+
+原作者 [BadGhost520](https://github.com/BadGhost520) 及所有贡献者
+
+还有我的钱包（改这玩意烧了我差不多40块钱的token）
