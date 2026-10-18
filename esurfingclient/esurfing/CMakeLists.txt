@@ -45,10 +45,17 @@ else ()
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -pthread")
 
     set(BUILD_SHARED_LIBS OFF)
-    set(OPENSSL_USE_STATIC_LIBS TRUE)
-    set(CURL_USE_STATIC_LIBS TRUE)
-
-    set(CMAKE_FIND_LIBRARY_SUFFIXES .a ${CMAKE_FIND_LIBRARY_SUFFIXES})
+    if (__OPENWRT__)
+        # OpenWrt 走发行版惯用的动态链接:
+        # SDK 里的 libcurl 常启用 HTTP/2(nghttp2) 等特性, 一旦强制静态链接,
+        # 这些传递依赖不会被 FindCURL 带出来, 直接 undefined reference。
+        set(OPENSSL_USE_STATIC_LIBS FALSE)
+        set(CURL_USE_STATIC_LIBS FALSE)
+    else ()
+        set(OPENSSL_USE_STATIC_LIBS TRUE)
+        set(CURL_USE_STATIC_LIBS TRUE)
+        set(CMAKE_FIND_LIBRARY_SUFFIXES .a ${CMAKE_FIND_LIBRARY_SUFFIXES})
+    endif ()
 endif ()
 
 find_package(CURL REQUIRED)

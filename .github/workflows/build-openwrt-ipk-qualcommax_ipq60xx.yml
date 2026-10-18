@@ -22,10 +22,12 @@ on:
         default: "24.10.6"
 
 env:
-  # The previous private signed URL expired and caused reproducible 401 failures.
-  # Use the official OpenWrt snapshot SDK, which is publicly downloadable.
-  SDK_URL: "https://downloads.openwrt.org/snapshots/targets/qualcommax/ipq60xx"
-  SDK_NAME: "openwrt-sdk-qualcommax-ipq60xx_gcc-14.4.0_musl.Linux-x86_64"
+  # 24.10(opkg) 官方没有 qualcommax/ipq60xx 的 SDK 目录, 只有 ipq807x。
+  # 两者同属 aarch64_cortex-a53 + musl, 本包是纯用户态程序(只依赖 libcurl/libopenssl),
+  # 用 ipq807x SDK 交叉编译出的 ipk 架构仍是 aarch64_cortex-a53, ipq60xx 可直接安装。
+  # 不能改用 snapshots: snapshot 已切到 apk, 产出的不是 ipk。
+  SDK_URL: "https://downloads.openwrt.org/releases/24.10.6/targets/qualcommax/ipq807x"
+  SDK_NAME: "openwrt-sdk-24.10.6-qualcommax-ipq807x_gcc-13.3.0_musl.Linux-x86_64"
 
 jobs:
   build:

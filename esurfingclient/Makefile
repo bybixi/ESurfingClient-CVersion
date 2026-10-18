@@ -29,19 +29,23 @@ endef
 
 CMAKE_SOURCE_SUBDIR:=.
 CMAKE_INSTALL:=1
+
+# OpenWrt 上 libcurl 用动态链接 (见 CMakeLists 里 __OPENWRT__ 分支):
+# 静态链接会把 HTTP/2 等传递依赖丢掉, 变成 undefined reference to nghttp2_*
 CMAKE_OPTIONS += \
 	-DCMAKE_BUILD_TYPE=Release \
 	-DCMAKE_INSTALL_PREFIX=/usr \
 	-DBUILD_SHARED_LIBS=OFF \
-	-DCMAKE_EXE_LINKER_FLAGS="-static -lpthread -latomic" \
-	-DCMAKE_C_FLAGS="-DCURL_STATICLIB -pthread $(EXTRA_MIPS_FLAGS)" \
-	-DCMAKE_CXX_FLAGS="-DCURL_STATICLIB -pthread $(EXTRA_MIPS_FLAGS)" \
+	-DCMAKE_EXE_LINKER_FLAGS="-lpthread" \
+	-DCMAKE_C_FLAGS="-pthread $(EXTRA_MIPS_FLAGS)" \
+	-DCMAKE_CXX_FLAGS="-pthread $(EXTRA_MIPS_FLAGS)" \
 	-D__OPENWRT__=1
 
 define Package/esurfingclient
 	SECTION:=net
 	CATEGORY:=Network
 	TITLE:=ESurfingClient
+	DEPENDS:=+libcurl +libopenssl +libatomic
 endef
 
 define Package/esurfingclient/conffiles
