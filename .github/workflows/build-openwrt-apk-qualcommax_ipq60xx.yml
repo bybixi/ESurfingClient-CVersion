@@ -11,11 +11,11 @@ on:
       version:
         required: true
         type: string
-        default: "2.0.4"
+        default: "2.0.5"
       release:
         required: true
         type: string
-        default: "7"
+        default: "1"
       sdk_version:
         required: true
         type: string
@@ -36,8 +36,8 @@ jobs:
 
       - name: 更新 Makefile 版本号
         run: |
-          sed -i "s/PKG_VERSION:=.*/PKG_VERSION:=${{ inputs.version || '2.0.4' }}/" esurfingclient/Makefile
-          sed -i "s/PKG_RELEASE:=.*/PKG_RELEASE:=${{ inputs.release || '7' }}/" esurfingclient/Makefile
+          sed -i "s/PKG_VERSION:=.*/PKG_VERSION:=${{ inputs.version || '2.0.5' }}/" esurfingclient/Makefile
+          sed -i "s/PKG_RELEASE:=.*/PKG_RELEASE:=${{ inputs.release || '1' }}/" esurfingclient/Makefile
 
       - name: 安装软件包 (最多重试 3 次)
         run: |
@@ -115,6 +115,7 @@ jobs:
 
       - name: 编译 esurfingclient
         run: |
+          set -eo pipefail
           echo "验证源码..."
           grep -c CURLOPT_CONNECTTIMEOUT esurfingclient/esurfing/src/NetClient.c || true
           grep -c reset_network_state esurfingclient/esurfing/src/NetClient.c || true
@@ -138,11 +139,16 @@ jobs:
 
           make package/esurfingclient/compile -j$(nproc) V=s 2>&1 | tail -50
 
-          find bin/packages -name "esurfingclient*.apk" -exec cp {} ../esurfingclient_${{ inputs.version || '2.0.4' }}-${{ inputs.release || '7' }}_qualcommax_ipq60xx.apk \;
+          src_pkg="$(find bin/packages -name "esurfingclient*.apk" | head -n 1)"
+          if [ -z "$src_pkg" ]; then
+            echo "::error::构建未产出 esurfingclient.apk, 编译其实失败了, 见上方 make 日志"
+            exit 1
+          fi
+          cp "$src_pkg" ../esurfingclient_${{ inputs.version || '2.0.5' }}-${{ inputs.release || '1' }}_qualcommax_ipq60xx.apk
 
       - name: 上传工件
         uses: actions/upload-artifact@v7
         with:
-          name: esurfingclient_${{ inputs.version || '2.0.4' }}-${{ inputs.release || '7' }}_qualcommax_ipq60xx-apk
-          path: esurfingclient_${{ inputs.version || '2.0.4' }}-${{ inputs.release || '7' }}_qualcommax_ipq60xx.apk
+          name: esurfingclient_${{ inputs.version || '2.0.5' }}-${{ inputs.release || '1' }}_qualcommax_ipq60xx-apk
+          path: esurfingclient_${{ inputs.version || '2.0.5' }}-${{ inputs.release || '1' }}_qualcommax_ipq60xx.apk
           retention-days: 30

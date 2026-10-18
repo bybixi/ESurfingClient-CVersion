@@ -4,8 +4,8 @@ PKG_NAME:=esurfingclient
 PKG_LICENSE:=Apache-2.0
 PKG_LICENSE_FILES:=../LICENSE
 
-PKG_VERSION:=2.0.4
-PKG_RELEASE:=7
+PKG_VERSION:=2.0.5
+PKG_RELEASE:=1
 
 PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)
 PKG_BUILD_PARALLEL:=1
@@ -71,10 +71,8 @@ if [ -f "/etc/init.d/esurfingclient.apk-new" ]; then
 	mv /etc/init.d/esurfingclient.apk-new /etc/init.d/esurfingclient
 fi
 
-if [ -x "/etc/init.d/esurfingclient" ]; then
-	echo "重启服务中"
-    /etc/init.d/esurfingclient restart 2>/dev/null &
-fi
+# 这里不再显式 restart: opkg 升级时 prerm 会停旧实例、postinst 之后由 opkg 拉起,
+# 自己再重启一次等于装一次包启动两遍 (apk 的 post-upgrade 会跳过停服务, 重复更明显)
 exit 0
 endef
 

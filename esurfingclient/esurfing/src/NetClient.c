@@ -29,6 +29,9 @@
 static const char s_req_content_type[] = "Content-Type: application/x-www-form-urlencoded";
 static const char s_req_accept[] = "Accept: text/html,text/xml,application/xhtml+xml,application/x-javascript,*/*";
 static const char s_generate_url[] = "http://connect.rom.miui.com/generate_204";
+// 主地址依赖 DNS 解析, 校园网 DNS 不稳时会误判断网; 备用地址用固定 IP,
+// 联网时返回 301, 需要认证时返回 302
+static const char s_generate_bak_url[] = "http://1.1.1.1";
 static _Thread_local char s_school_id[SCHOOL_ID_LENGTH];
 static _Thread_local char s_domain[DOMAIN_LENGTH];
 static _Thread_local char s_area[AREA_LENGTH];
@@ -437,8 +440,9 @@ http_resp_t post(const char* url, const char* data)
     }
 
     LOG_VERBOSE("获取响应码");
-    long resp_code;
+    long resp_code = 0;
     curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &resp_code);
+    resp.http_code = resp_code;
 
     curl_easy_cleanup(curl);
     curl_slist_free_all(headers);
@@ -535,8 +539,9 @@ http_resp_t get(const char* url)
     }
 
     LOG_VERBOSE("获取响应码");
-    long resp_code;
+    long resp_code = 0;
     curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &resp_code);
+    resp.http_code = resp_code;
 
     curl_easy_cleanup(curl);
     curl_slist_free_all(headers);
@@ -569,11 +574,38 @@ http_resp_t get(const char* url)
 NetworkStatus check_network_status()
 {
     http_resp_t resp = get(s_generate_url);
-    if (resp.curl_code == CURLE_COULDNT_RESOLVE_HOST)
+    if (resp.curl_code != CURLE_OK)
     {
-        LOG_WARN("DNS 解析错误, 不再将超时兜底伪装为联网成功");
+        // 主地址失败 (最常见的是 DNS 解析不到) 时改用固定 IP 的备用地址,
+        // 避免 DNS 抖动被当成"断网"而触发无意义的重连
+        LOG_WARN("主检测地址不可用 (curl: %d), 改用备用地址 %s", (int)resp.curl_code, s_generate_bak_url);
         if (resp.body_data) free(resp.body_data);
-        return REQUEST_WARN;
+        resp = get(s_generate_bak_url);
+        if (resp.curl_code != CURLE_OK)
+        {
+            LOG_WARN("备用检测地址也不可用 (curl: %d), 判定为网络异常", (int)resp.curl_code);
+            if (resp.body_data) free(resp.body_data);
+            return REQUEST_WARN;
+        }
+        // 1.1.1.1: 301 联网, 302 需要认证; 其它响应多半被门户劫持,
+        // 既不能当成联网, 也不该计入"重试 5 次就退出", 因此按 WARN 等待
+        NetworkStatus status;
+        switch (resp.http_code)
+        {
+        case 301:
+        case 204:
+            status = REQUEST_SUCCESS;
+            break;
+        case 302:
+            status = REQUEST_REDIRECT;
+            break;
+        default:
+            status = REQUEST_WARN;
+            break;
+        }
+        LOG_INFO("备用检测结果: HTTP %ld", resp.http_code);
+        if (resp.body_data) free(resp.body_data);
+        return status;
     }
     const NetworkStatus status = resp.status;
     if (resp.body_data) free(resp.body_data);

@@ -2,7 +2,7 @@
 
 > 本项目 fork 自 [BadGhost520/ESurfingClient-CVersion](https://github.com/BadGhost520/ESurfingClient-CVersion)，修复了导致路由器断网、内存泄漏、磁盘写爆、DNS 崩溃等多个关键问题。
 
-> **最新编译**: [v2.0.4-r7](https://github.com/bybixi/ESurfingClient-CVersion/releases/tag/v2.0.4-r7)
+> **最新编译**: [v2.0.5-r1](https://github.com/bybixi/ESurfingClient-CVersion/releases/tag/v2.0.5-r1)
 
 ## 本人路由器7天负载下实际运行情况
 
@@ -39,6 +39,18 @@
 | `get_last_location()` 重定向死循环 | 退出信号检查 |
 | `shut()` 线程句柄 + 数组泄漏 | `free(thread)` + `free(g_prog_status)` |
 | `clean_logger()` `return` 后死代码 (r7) | 关闭 handle 后清理无法执行的 rename 逻辑 |
+### r1 (2.0.5) 安全与可用性加固
+
+| 范围 | 修复 |
+|------|------|
+| 凭据泄露 | 登录 XML 含明文账号密码，VERBOSE 级别会把整段内容写进 `run.log`；改为只记录长度，内容一律不回显 |
+| 文件权限 | 配置与日志文件改为以 `0600` 创建；原来受 umask 影响是 `0644`，同机其他用户可以读到密码 |
+| 本地 Web 鉴权 | `/api/getConfigs` 增加 `Host` / `Origin` 校验，挡住 DNS rebinding 读取账号；配置不可用时返回空配置而不是 500 |
+| 配置自锁 | 配置损坏不再直接退出或死等，改为周期重读，文件改好后自动继续；Web 服务提前到配置之前启动，页面始终能打开 |
+| 网络检测 | 主检测地址失败时退到固定 IP 备用地址（`1.1.1.1`），不再把 DNS 抖动当成断网 |
+| 构建可信度 | 8 个 OpenWrt 构建加 `set -eo pipefail`，并对产物做存在性断言；原来 `make ... \| tail` 会吞掉失败码，缺包也显示成功 |
+| 打包 | 去掉 `postinst` 里多余的 `restart`（装一次包会启动两遍）；init 脚本补 `term_timeout 15`，并在停止时归档 `run.log` |
+
 ### r7 稳定性与安全加固
 
 | 范围 | 修复 |
@@ -66,7 +78,7 @@
 ### OpenWrt (mediatek_filogic)
 
 ```bash
-wget https://github.com/bybixi/ESurfingClient-CVersion/releases/download/v2.0.4-r7/esurfingclient_2.0.4-7_mediatek_filogic.ipk -O /tmp/esurfingclient.ipk
+wget https://github.com/bybixi/ESurfingClient-CVersion/releases/download/v2.0.5-r1/esurfingclient_2.0.5-1_mediatek_filogic.ipk -O /tmp/esurfingclient.ipk
 opkg install /tmp/esurfingclient.ipk --force-reinstall
 /etc/init.d/esurfingclient restart
 ```

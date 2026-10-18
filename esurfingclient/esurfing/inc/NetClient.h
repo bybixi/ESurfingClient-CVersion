@@ -16,6 +16,7 @@ typedef enum {
 typedef struct {
     NetworkStatus status;
     CURLcode curl_code;
+    long http_code;      // 原始 HTTP 状态码, 0 表示没拿到 (连接/解析失败)
     char* body_data;
     size_t body_size;
 } http_resp_t;

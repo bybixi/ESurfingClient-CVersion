@@ -6,9 +6,44 @@ STOP=10
 USE_PROCD=1
 PROG=/usr/bin/esurfingclient
 
+# 与程序内的默认日志目录保持一致 (Logger.c: /var/log/esurfing/logs)
+LOG_DIR=/var/log/esurfing/logs
+# 归档文件保留份数, 日志目录在 tmpfs 上, 不设上限会一直吃内存
+LOG_KEEP=10
+
 boot() {
   sleep 5
   start
+}
+
+# 把上一轮遗留的 run.log 改名归档, 避免新一轮把它当成本轮日志继续写
+archive_previous_log() {
+  local log_file ts target n
+
+  log_file="$LOG_DIR/run.log"
+  [ -s "$log_file" ] || return 0
+
+  ts="$(date +%Y%m%d-%H%M%S)"
+  target="$LOG_DIR/$ts.log"
+
+  # 同一秒内多次停止也不能覆盖已有的归档
+  n=1
+  while [ -e "$target" ]; do
+      target="$LOG_DIR/$ts-$n.log"
+      n=$((n + 1))
+  done
+
+  mv "$log_file" "$target" 2>/dev/null || return 0
+}
+
+# 只保留最近 LOG_KEEP 份归档
+prune_archived_log() {
+  local count=0 f
+
+  for f in $(ls -1t "$LOG_DIR"/*.log 2>/dev/null); do
+      count=$((count + 1))
+      [ "$count" -gt "$LOG_KEEP" ] && rm -f "$f"
+  done
 }
 
 start_service() {
@@ -24,12 +59,24 @@ start_service() {
       return 1
   fi
 
+  # 上一轮如果被强杀, run.log 会留在原地, 启动时兜底归档一次
+  archive_previous_log
+  prune_archived_log
+
   sleep 5
 
   procd_open_instance esurfingclient
   procd_set_param command ${PROG}
   procd_set_param respawn 60 5 5
+  # 停止时给登出请求留足时间: 被 SIGKILL 掉会让账号挂在服务端在线
+  procd_set_param term_timeout 15
   procd_set_param stdout 0
   procd_set_param stderr 0
   procd_close_instance
+}
+
+# procd 回收完实例之后调用, 此时 run.log 已经没人写了
+service_stopped() {
+  archive_previous_log
+  prune_archived_log
 }

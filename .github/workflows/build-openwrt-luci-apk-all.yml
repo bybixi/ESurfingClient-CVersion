@@ -85,7 +85,12 @@ jobs:
         run: |
           cd openwrt-sdk
           make package/luci-app-esurfingclient/compile V=sc -j$(nproc)
-          find bin/packages -name "luci-app-esurfingclient*.apk" -exec cp {} ../luci-app-esurfingclient_${{ inputs.version }}-${{ inputs.release }}_all.apk \;
+          src_pkg="$(find bin/packages -name "luci-app-esurfingclient*.apk" | head -n 1)"
+          if [ -z "$src_pkg" ]; then
+            echo "::error::构建未产出 luci-app-esurfingclient.apk, 编译其实失败了, 见上方 make 日志"
+            exit 1
+          fi
+          cp "$src_pkg" ../luci-app-esurfingclient_${{ inputs.version }}-${{ inputs.release }}_all.apk
 
       - name: 上传工件
         uses: actions/upload-artifact@v7

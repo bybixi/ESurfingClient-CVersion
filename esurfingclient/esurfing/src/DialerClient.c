@@ -705,11 +705,25 @@ void work()
     LOG_INFO(" - 制作不易, 赞助鬼鬼, 让鬼鬼更好地去维护更新这个项目罢~");
     LOG_INFO("-------------------------------------------------------------------");
 
-    if (load_cfg() == false) shut(is_shutdown_requested() ? 0 : 1); // 加载配置文件
-
 #ifndef __OPENWRT__
+    // Web 服务先于配置启动: 配置文件写坏时网页仍能打开, 否则用户会被锁在门外
     if (start_web_server() == false) shut(1); // 启动 Web 服务器线程
 #endif
+
+    // 配置不可用时不退出, 定期重读; 用户改好配置文件后程序自动继续, 无需重启
+    uint32_t cfg_wait_ticks = 0;
+    while (load_cfg() == false)
+    {
+        if (g_need_exit || is_shutdown_requested()) shut(0);
+        cfg_wait_ticks++;
+        if (cfg_wait_ticks == 1 || cfg_wait_ticks % 15 == 0)
+        {
+            LOG_WARN("配置不可用, 已等待 %u 秒; 修好配置文件后会自动继续",
+                     (unsigned int)(cfg_wait_ticks * 2));
+        }
+        sleep_ms(2000, true);
+    }
+    LOG_INFO("配置加载完成, 账号数: %u", (unsigned int)g_prog_cnt);
 
     /**
      * 检测网络状态
