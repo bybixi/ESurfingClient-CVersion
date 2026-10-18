@@ -7,6 +7,9 @@
 #include <stdarg.h>
 #include <fcntl.h>
 #include <errno.h>
+#ifndef _WIN32
+#include <unistd.h>
+#endif
 
 #ifdef _WIN32
 #include <windows.h>
@@ -23,6 +26,33 @@ static void logger_unlock(logger_lock_t* lock) { pthread_mutex_unlock(lock); }
 #endif
 
 static const char s_file_name[] = "run.log";
+
+/**
+ * @brief 以仅所有者可读写 (0600) 的方式打开日志文件
+ * @param path 日志文件路径
+ * @return 文件句柄, 失败返回 NULL
+ * @note 日志可能包含账号等信息, 不能沿用 umask 决定的 0644
+ */
+static FILE* open_log_file_private(const char* path)
+{
+    if (!path) return NULL;
+#ifdef _WIN32
+    return fopen(path, "a");
+#else
+    const int fd = open(path, O_WRONLY | O_CREAT | O_APPEND, 0600);
+    if (fd < 0) return NULL;
+    // 已存在的旧文件不会被 mode 参数改权限, 这里显式收紧一次
+    (void)fchmod(fd, 0600);
+    FILE* fp = fdopen(fd, "a");
+    if (!fp)
+    {
+        close(fd);
+        return NULL;
+    }
+    return fp;
+#endif
+}
+
 static logger_lock_t s_logger_lock = LOGGER_LOCK_INIT;
 
 #ifdef __OPENWRT__
@@ -84,7 +114,7 @@ static void rotate()
     }
     s_logger_cfg.cur_lines = 0;
     s_logger_cfg.cur_bytes = 0;
-    s_logger_cfg.file_handle = fopen(s_logger_cfg.log_file, "a");
+    s_logger_cfg.file_handle = open_log_file_private(s_logger_cfg.log_file);
     if (s_logger_cfg.file_handle == NULL) fprintf(stderr, "[ERROR] failed to reopen log file after rotate: %s\n", s_logger_cfg.log_file);
     return;
 }
@@ -226,7 +256,7 @@ bool init_logger()
         return false;
     }
     logger_lock(&s_logger_lock);
-    s_logger_cfg.file_handle = fopen(s_logger_cfg.log_file, "a");
+    s_logger_cfg.file_handle = open_log_file_private(s_logger_cfg.log_file);
     if (!s_logger_cfg.file_handle)
     {
         logger_unlock(&s_logger_lock);

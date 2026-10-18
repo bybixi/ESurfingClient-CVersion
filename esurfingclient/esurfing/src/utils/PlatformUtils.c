@@ -18,6 +18,12 @@
 #include <sysinfoapi.h>
 #include <iphlpapi.h>
 
+#else
+
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/stat.h>
+
 #endif
 
 #ifdef __OPENWRT__
@@ -28,6 +34,36 @@ static char config_file[PATH_MAX + 1 + sizeof(DIALER_CONFIG_FILE)];
 #endif
 
 #define MAX_CONFIG_FILE_SIZE (1024 * 1024)
+
+/**
+ * @brief 以仅所有者可读写 (0600) 的方式打开配置文件用于写入
+ * @param path 配置文件路径
+ * @return 文件句柄, 失败返回 NULL
+ * @note 配置文件内含账号密码明文, 不能沿用 umask 决定的 0644
+ */
+static FILE* open_cfg_file_private(const char* path)
+{
+    if (!path) return NULL;
+#ifdef _WIN32
+    // Windows 上没有 POSIX 权限位, ACL 由用户目录决定
+    return fopen(path, "w");
+#else
+    const int fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0600);
+    if (fd < 0) return NULL;
+    // 已存在的旧文件不会被 mode 参数改权限, 这里显式收紧一次
+    if (fchmod(fd, 0600) != 0)
+    {
+        LOG_WARN("无法收紧配置文件权限 (可能不是文件所有者): %s", path);
+    }
+    FILE* fp = fdopen(fd, "w");
+    if (!fp)
+    {
+        close(fd);
+        return NULL;
+    }
+    return fp;
+#endif
+}
 
 typedef struct
 {
@@ -464,7 +500,8 @@ char* create_xml_payload(const XmlChoose choose)
         return NULL;
     }
     LOG_DEBUG("创建 XML 完成");
-    LOG_VERBOSE("XML 内容为:\n%s", xml);
+    // 登录 XML 含 <userid>/<passwd> 明文, 任何级别都不回显内容, 只报告长度
+    LOG_VERBOSE("XML 已生成, 长度 %u 字节 (含凭据, 内容不回显)", (unsigned int)xml_len);
     return xml;
 }
 
@@ -540,7 +577,7 @@ bool save_cfg(char* configs_str)
         return false;
     }
 
-    FILE* cfg_file = fopen(config_file, "w");
+    FILE* cfg_file = open_cfg_file_private(config_file);
     if (!cfg_file)
     {
         LOG_ERROR("无法生成文件: %s", config_file);
@@ -566,15 +603,8 @@ bool load_cfg()
     char dir[PATH_MAX];
     if (get_exec_dir(dir) == false)
     {
-        LOG_ERROR("获取可执行文件路径失败, 请检查权限后重启");
-        while (true)
-        {
-            if (g_need_exit || is_shutdown_requested())
-            {
-                return false;
-            }
-            sleep_ms(10000, true);
-        }
+        LOG_ERROR("获取可执行文件路径失败, 请检查权限后重试");
+        return false;
     }
     snprintf(config_file, PATH_MAX + 1 + sizeof(DIALER_CONFIG_FILE), "%s%c%s", safe_str(dir), SEP, DIALER_CONFIG_FILE);
 
@@ -592,7 +622,7 @@ bool load_cfg()
     {
         LOG_ERROR("无法打开配置文件或配置文件为空: %s", config_file);
         LOG_INFO("创建新的默认配置文件");
-        FILE* new_cfg = fopen(config_file, "w");
+        FILE* new_cfg = open_cfg_file_private(config_file);
         if (!new_cfg)
         {
             LOG_FATAL("无法生成文件: %s, 请检查权限后重启", config_file);
@@ -607,15 +637,9 @@ bool load_cfg()
         }
         fprintf(new_cfg, "%s", s_default_cfg);
         fclose(new_cfg);
-        LOG_INFO("创建完成, 请在 %s 填写账号数据, 然后重启", config_file);
-        while (true)
-        {
-            if (g_need_exit || is_shutdown_requested())
-            {
-                return false;
-            }
-            sleep_ms(10000, true);
-        }
+        LOG_INFO("已在 %s 生成配置模板, 填写账号后将自动继续", config_file);
+        // 交给调用方重试: 用户填好账号后无需重启程序
+        return false;
     }
 
     if (fseek(cfg_file, 0, SEEK_END) != 0)
@@ -660,15 +684,8 @@ bool load_cfg()
     free(cfg_data);
     if (!cfg_json)
     {
-        LOG_FATAL("JSON 解析失败, 请检查后重启");
-        while (true)
-        {
-            if (g_need_exit || is_shutdown_requested())
-            {
-                return false;
-            }
-            sleep_ms(10000, true);
-        }
+        LOG_ERROR("JSON 解析失败, 等待配置文件修复后自动重试");
+        return false;
     }
 
     const cJSON* log_lv = cJSON_GetObjectItem(cfg_json, "log_lv");
@@ -686,17 +703,10 @@ bool load_cfg()
     const cJSON* enabled = cJSON_GetObjectItem(cfg_json, "enabled");
     if (enabled == NULL || !cJSON_IsBool(enabled))
     {
-        LOG_WARN("enabled 参数不存在, 请填写后重启程序");
+        LOG_WARN("enabled 参数不存在, 等待配置文件修复后自动重试");
+        g_prog_enabled = false;
         cJSON_Delete(cfg_json);
-        while (true)
-        {
-            if (g_need_exit || is_shutdown_requested())
-            {
-                return false;
-            }
-            g_prog_enabled = false;
-            sleep_ms(10000, true);
-        }
+        return false;
     }
     if (cJSON_IsFalse(enabled))
     {
@@ -717,16 +727,9 @@ bool load_cfg()
     const cJSON* accounts = cJSON_GetObjectItem(cfg_json, "accounts");
     if (accounts == NULL || cJSON_IsArray(accounts) == false || cJSON_GetArraySize(accounts) == 0)
     {
-        LOG_FATAL("没有找到账号数据, 请添加后重启程序");
+        LOG_ERROR("没有找到账号数据, 等待配置文件修复后自动重试");
         cJSON_Delete(cfg_json);
-        while (true)
-        {
-            if (g_need_exit || is_shutdown_requested())
-            {
-                return false;
-            }
-            sleep_ms(10000, true);
-        }
+        return false;
     }
 
     const int account_count = cJSON_GetArraySize(accounts);
@@ -981,15 +984,8 @@ bool load_cfg()
 
     if (valid_cnt == 0)
     {
-        LOG_FATAL("无可用配置, 请检查后重启程序");
-        while (true)
-        {
-            if (g_need_exit || is_shutdown_requested())
-            {
-                return false;
-            }
-            sleep_ms(10000, true);
-        }
+        LOG_ERROR("无可用配置 (账号或密码为空), 等待配置文件修复后自动重试");
+        return false;
     }
 
     g_prog_cnt = valid_cnt;

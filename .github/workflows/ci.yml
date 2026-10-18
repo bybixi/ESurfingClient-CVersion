@@ -35,8 +35,8 @@ jobs:
             ! -path '*/utils/cJSON.c' -print0)
           gcc -std=gnu11 -Wall -Wextra -Wno-unused-parameter -fsyntax-only \
             -Iinc \
-            -DPROGRAM_VERSION='"2.0.4"' \
-            -DPROGRAM_FULL_VERSION='"2.0.4-r7"' \
+            -DPROGRAM_VERSION='"2.0.5"' \
+            -DPROGRAM_FULL_VERSION='"2.0.5-r1"' \
             -DWEB_ROOT_PATH='"portal"' \
             "${sources[@]}" Main.c \
             $(pkg-config --cflags libcurl openssl) -pthread
@@ -49,8 +49,8 @@ jobs:
           gcc -std=gnu11 -Wall -Wextra -Wno-unused-parameter -fsyntax-only \
             -Iinc \
             -D__OPENWRT__=1 \
-            -DPROGRAM_VERSION='"2.0.4"' \
-            -DPROGRAM_FULL_VERSION='"2.0.4-r7"' \
+            -DPROGRAM_VERSION='"2.0.5"' \
+            -DPROGRAM_FULL_VERSION='"2.0.5-r1"' \
             -DWEB_ROOT_PATH='"portal"' \
             "${openwrt_sources[@]}" Main.c \
             $(pkg-config --cflags libcurl openssl) -pthread

@@ -12,11 +12,61 @@ static const char* listenAddr = "http://127.0.0.1:8888";
 static sim_thread_t* web_thread;
 static atomic_int s_web_start_state = ATOMIC_VAR_INIT(0);
 
+/**
+ * @brief 判断请求是否来自本机页面
+ * @param hm HTTP 请求
+ * @return 是本机请求返回 true
+ * @note Web 服务没有鉴权, 只靠回环绑定不够: 恶意页面可把域名解析到 127.0.0.1
+ *       (DNS rebinding) 后以同源身份读取 /api/getConfigs, 因此这里再校验
+ *       Host 与 Origin 头
+ */
+static bool request_from_local_page(struct mg_http_message* hm)
+{
+    static const char* const allowed_hosts[] = {
+        "127.0.0.1:8888",
+        "localhost:8888",
+        "[::1]:8888"
+    };
+    static const char* const allowed_origins[] = {
+        "http://127.0.0.1:8888",
+        "http://localhost:8888",
+        "http://[::1]:8888"
+    };
+
+    struct mg_str* host = mg_http_get_header(hm, "Host");
+    if (host == NULL) return false;
+
+    bool host_ok = false;
+    for (size_t i = 0; i < sizeof(allowed_hosts) / sizeof(allowed_hosts[0]); i++)
+    {
+        if (mg_strcasecmp(*host, mg_str(allowed_hosts[i])) == 0)
+        {
+            host_ok = true;
+            break;
+        }
+    }
+    if (!host_ok) return false;
+
+    // 浏览器发起跨站请求时会带 Origin, 同名来源则不带
+    struct mg_str* origin = mg_http_get_header(hm, "Origin");
+    if (origin == NULL) return true;
+    for (size_t i = 0; i < sizeof(allowed_origins) / sizeof(allowed_origins[0]); i++)
+    {
+        if (mg_strcasecmp(*origin, mg_str(allowed_origins[i])) == 0) return true;
+    }
+    return false;
+}
+
 static void fn(struct mg_connection *c, const int ev, void *ev_data)
 {
     if (ev != MG_EV_HTTP_MSG) return;
 
     struct mg_http_message *hm = ev_data;
+    if (!request_from_local_page(hm))
+    {
+        mg_http_reply(c, 403, "Content-Type: text/plain\r\n", "forbidden\n");
+        return;
+    }
     struct mg_http_serve_opts opts = { .root_dir = "portal" };
     if (mg_strcmp(hm->method, mg_str("GET")) == 0)
     {
@@ -62,7 +112,7 @@ static void fn(struct mg_connection *c, const int ev, void *ev_data)
             cJSON* configs = cJSON_CreateObject();
             cJSON* accounts = cJSON_CreateArray();
             cJSON* account = cJSON_CreateObject();
-            if (!configs || !accounts || !account || g_prog_status == NULL || g_prog_cnt <= 0)
+            if (!configs || !accounts || !account)
             {
                 cJSON_Delete(configs);
                 cJSON_Delete(accounts);
@@ -72,10 +122,21 @@ static void fn(struct mg_connection *c, const int ev, void *ev_data)
             }
             cJSON_AddBoolToObject(configs, "enabled", g_prog_enabled);
             cJSON_AddNumberToObject(configs, "log_lv", get_logger_level());
-            cJSON_AddStringToObject(account, "username", g_prog_status[0].login_cfg.usr);
-            cJSON_AddStringToObject(account, "password", "");
-            cJSON_AddStringToObject(account, "channel", g_prog_status[0].login_cfg.chn);
-            cJSON_AddItemToArray(accounts, account);
+            if (g_prog_status == NULL || g_prog_cnt <= 0)
+            {
+                // 配置尚未加载成功 (文件缺失/JSON 损坏/账号为空):
+                // 网页是用户唯一的修复入口, 这里返回空配置而不是 500,
+                // 让页面仍能打开并提示用户检查配置文件
+                cJSON_Delete(account); // 本分支用不到, 直接回收, 避免泄漏
+                cJSON_AddBoolToObject(configs, "config_error", true);
+            }
+            else
+            {
+                cJSON_AddStringToObject(account, "username", g_prog_status[0].login_cfg.usr);
+                cJSON_AddStringToObject(account, "password", "");
+                cJSON_AddStringToObject(account, "channel", g_prog_status[0].login_cfg.chn);
+                cJSON_AddItemToArray(accounts, account);
+            }
             cJSON_AddItemToObject(configs, "accounts", accounts);
             char* config_str = cJSON_PrintUnformatted(configs);
             cJSON_Delete(configs);

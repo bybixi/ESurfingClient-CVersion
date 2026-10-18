@@ -11,20 +11,21 @@ on:
       version:
         required: true
         type: string
-        default: "2.0.4"
+        default: "2.0.5"
       release:
         required: true
         type: string
-        default: "6"
+        default: "1"
       sdk_version:
         required: true
         type: string
         default: "24.10.6"
 
 env:
-  SDK_URL: "https://openlist.xylg.com:20001/d/openwrt"
-  SDK_NAME: "openwrt-sdk-qualcommax-ipq60xx_gcc-13.3.0_musl.Linux-x86_64"
-  SIGN: "?sign=uAFe1eM2MaZDZySkAAxKMuU9Tn7QJdS6VklJfdjxZ9o=:0"
+  # The previous private signed URL expired and caused reproducible 401 failures.
+  # Use the official OpenWrt snapshot SDK, which is publicly downloadable.
+  SDK_URL: "https://downloads.openwrt.org/snapshots/targets/qualcommax/ipq60xx"
+  SDK_NAME: "openwrt-sdk-qualcommax-ipq60xx_gcc-14.4.0_musl.Linux-x86_64"
 
 jobs:
   build:
@@ -37,8 +38,8 @@ jobs:
 
       - name: 更新 Makefile 版本号
         run: |
-          sed -i "s/PKG_VERSION:=.*/PKG_VERSION:=${{ inputs.version || '2.0.4' }}/" esurfingclient/Makefile
-          sed -i "s/PKG_RELEASE:=.*/PKG_RELEASE:=${{ inputs.release || '7' }}/" esurfingclient/Makefile
+          sed -i "s/PKG_VERSION:=.*/PKG_VERSION:=${{ inputs.version || '2.0.5' }}/" esurfingclient/Makefile
+          sed -i "s/PKG_RELEASE:=.*/PKG_RELEASE:=${{ inputs.release || '1' }}/" esurfingclient/Makefile
 
       - name: 安装软件包 (最多重试 3 次)
         run: |
@@ -65,7 +66,7 @@ jobs:
       - name: 下载 SDK
         if: steps.cache-openwrt-sdk.outputs.cache-hit != 'true'
         run: |
-          wget ${{ env.SDK_URL }}/${{ env.SDK_NAME }}.tar.zst${{ env.SIGN }} -O ${{ env.SDK_NAME }}.tar.zst
+          wget ${{ env.SDK_URL }}/${{ env.SDK_NAME }}.tar.zst -O ${{ env.SDK_NAME }}.tar.zst
 
       - name: 解压 SDK
         run: |
@@ -116,6 +117,7 @@ jobs:
 
       - name: 编译 esurfingclient
         run: |
+          set -eo pipefail
           echo "验证源码..."
           grep -c CURLOPT_CONNECTTIMEOUT esurfingclient/esurfing/src/NetClient.c || true
           grep -c reset_network_state esurfingclient/esurfing/src/NetClient.c || true
@@ -139,11 +141,16 @@ jobs:
 
           make package/esurfingclient/compile -j$(nproc) V=s 2>&1 | tail -50
 
-          find bin/packages -name "esurfingclient*.ipk" -exec cp {} ../esurfingclient_${{ inputs.version || '2.0.4' }}-${{ inputs.release || '7' }}_qualcommax_ipq60xx.ipk \;
+          src_pkg="$(find bin/packages -name "esurfingclient*.ipk" | head -n 1)"
+          if [ -z "$src_pkg" ]; then
+            echo "::error::构建未产出 esurfingclient.ipk, 编译其实失败了, 见上方 make 日志"
+            exit 1
+          fi
+          cp "$src_pkg" ../esurfingclient_${{ inputs.version || '2.0.5' }}-${{ inputs.release || '1' }}_qualcommax_ipq60xx.ipk
 
       - name: 上传工件
         uses: actions/upload-artifact@v7
         with:
-          name: esurfingclient_${{ inputs.version || '2.0.4' }}-${{ inputs.release || '7' }}_qualcommax_ipq60xx-ipk
-          path: esurfingclient_${{ inputs.version || '2.0.4' }}-${{ inputs.release || '7' }}_qualcommax_ipq60xx.ipk
+          name: esurfingclient_${{ inputs.version || '2.0.5' }}-${{ inputs.release || '1' }}_qualcommax_ipq60xx-ipk
+          path: esurfingclient_${{ inputs.version || '2.0.5' }}-${{ inputs.release || '1' }}_qualcommax_ipq60xx.ipk
           retention-days: 30
